@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>DNF patch manager Halo icon</title>
+  <rect width="512" height="512" rx="108" fill="#0a0b0f"/>
+  <rect x="36" y="36" width="440" height="440" rx="82" fill="#14151c" stroke="#3a3d4a" stroke-width="12"/>
+  <path d="M132 158h116c78 0 132 38 132 98s-54 98-132 98H132V158Z" fill="none" stroke="#5b6bff" stroke-width="42" stroke-linejoin="round"/>
+  <path d="M236 158v196" stroke="#3dd7e5" stroke-width="26" stroke-linecap="round"/>
+  <circle cx="362" cy="150" r="18" fill="#2be08c"/>
+</svg>

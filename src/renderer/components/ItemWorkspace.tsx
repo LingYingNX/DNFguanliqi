@@ -1,0 +1,745 @@
+import {
+  Box,
+  Boxes,
+  FolderInput,
+  FolderOpen,
+  Grid2X2,
+  Layers,
+  List,
+  LogIn,
+  PackageOpen,
+  Pencil,
+  Search,
+  Trash2,
+  Ungroup,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  decodeWorkspaceItemDrag,
+  encodeWorkspaceItemDrag,
+  LIBRARY_ITEMS_DRAG_TYPE,
+} from "../workspace/item-drag";
+import {
+  type CardSize,
+  type EnabledCounts,
+  type EnabledFilter,
+  itemCategoryPath,
+  itemDate,
+  itemDescription,
+  itemLocation,
+  itemType,
+  type ViewMode,
+  type WorkspaceItem,
+  type WorkspaceItemReference,
+  workspaceItemKey,
+  workspaceItemReference,
+} from "../workspace/model";
+import type { SelectionModifiers } from "../workspace/useItemSelection";
+import type { WorkspaceScope } from "../workspace/useWorkspace";
+import { ContextMenu, type ContextMenuAction } from "./ContextMenu";
+
+type SelectionBox = {
+  readonly currentX: number;
+  readonly currentY: number;
+  readonly startX: number;
+  readonly startY: number;
+};
+
+type ItemWorkspaceProps = {
+  readonly cardSize: CardSize;
+  readonly categoryPath: string;
+  readonly enabledCounts: EnabledCounts;
+  readonly enabledFilter: EnabledFilter;
+  readonly scope: WorkspaceScope;
+  readonly items: readonly WorkspaceItem[];
+  readonly includeDescendants: boolean;
+  readonly loading: boolean;
+  readonly onQueryChange: (query: string) => void;
+  readonly onBoxSelect: (relativePaths: readonly string[]) => void;
+  readonly onImportDropped: (files: readonly File[]) => void;
+  readonly onRevealSource: (relativePath: string) => void;
+  readonly onIncludeDescendantsChange: (include: boolean) => void;
+  readonly onEnabledFilterChange: (filter: EnabledFilter) => void;
+  readonly onViewModeChange: (mode: ViewMode) => void;
+  readonly showDescendantToggle: boolean;
+  readonly onCreateGroup: () => void;
+  readonly onAddGroupMembers: (groupId: string, patches: readonly WorkspaceItemReference[]) => void;
+  readonly onDissolveGroup: () => void;
+  readonly onEnterGroup: (item: WorkspaceItem) => void;
+  readonly onReturnFromGroup: (() => void) | undefined;
+  readonly onAddToPreset: () => void;
+  readonly onMove: () => void;
+  readonly onMoveTo: (
+    targetDirectoryRelativePath: string,
+    items: readonly WorkspaceItemReference[],
+  ) => void;
+  readonly onRecycle: () => void;
+  readonly onRenameItem: (item: WorkspaceItem, newName: string) => Promise<boolean>;
+  readonly onSetItemEnabled: (item: WorkspaceItem, enabled: boolean) => void;
+  readonly onSelectPreview: (item: WorkspaceItem) => void;
+  readonly onSelect: (relativePath: string, modifiers: SelectionModifiers) => void;
+  readonly selectedPaths: readonly string[];
+  readonly selectedItems: readonly WorkspaceItem[];
+  readonly operationBusy: boolean;
+  readonly query: string;
+  readonly visibleItems: readonly WorkspaceItem[];
+  readonly viewMode: ViewMode;
+  readonly readOnly: boolean;
+  readonly moveTargets: readonly MoveTarget[];
+};
+
+type MoveTarget = {
+  readonly children: readonly MoveTarget[];
+  readonly label: string;
+  readonly relativePath: string;
+  readonly disabled: boolean;
+};
+
+function moveTargetActions(
+  targets: readonly MoveTarget[],
+  selectedItems: readonly WorkspaceItem[],
+  onMoveTo: (targetDirectoryRelativePath: string, items: readonly WorkspaceItemReference[]) => void,
+): readonly ContextMenuAction[] {
+  return targets.map((target) => ({
+    ...(target.children.length === 0
+      ? {}
+      : { children: moveTargetActions(target.children, selectedItems, onMoveTo) }),
+    disabled: target.disabled,
+    icon: <FolderInput size={15} />,
+    label: target.label,
+    onClick: () => onMoveTo(target.relativePath, selectedItems.map(workspaceItemReference)),
+  }));
+}
+
+function renameInputValue(item: WorkspaceItem): string {
+  return item.kind === "patch" ? item.name.replace(/\.npk$/iu, "") : item.name;
+}
+
+function renameFileName(item: WorkspaceItem, value: string): string {
+  if (item.kind !== "patch" || /\.npk$/iu.test(value)) return value;
+  return `${value}.npk`;
+}
+
+function intersects(box: SelectionBox, element: DOMRect): boolean {
+  const left = Math.min(box.startX, box.currentX);
+  const right = Math.max(box.startX, box.currentX);
+  const top = Math.min(box.startY, box.currentY);
+  const bottom = Math.max(box.startY, box.currentY);
+  return (
+    element.right >= left && element.left <= right && element.bottom >= top && element.top <= bottom
+  );
+}
+
+function isSelectionExcludedTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest(
+      ".workspace-heading, .empty-state, .item-context-menu, button, input, textarea, select, label",
+    ) !== null
+  );
+}
+
+function isWorkspaceItemsDrag(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).includes(LIBRARY_ITEMS_DRAG_TYPE);
+}
+
+type ContextMenuState = {
+  readonly item: WorkspaceItem;
+  readonly selectedItems: readonly WorkspaceItem[];
+  readonly x: number;
+  readonly y: number;
+};
+
+export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
+  const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [groupDropTargetPath, setGroupDropTargetPath] = useState<string | null>(null);
+  const [renameState, setRenameState] = useState<{
+    readonly item: WorkspaceItem;
+    readonly value: string;
+    readonly submitting: boolean;
+  } | null>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const renamePath = renameState === null ? undefined : workspaceItemKey(renameState.item);
+
+  useEffect(() => {
+    if (renamePath === undefined) {
+      return;
+    }
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [renamePath]);
+
+  const beginRename = (item: WorkspaceItem): void => {
+    if (props.readOnly || props.operationBusy) {
+      return;
+    }
+    const itemKey = workspaceItemKey(item);
+    if (!props.selectedPaths.includes(itemKey)) {
+      props.onSelect(itemKey, { range: false, toggle: false });
+    }
+    setContextMenu(null);
+    setRenameState({ item, value: renameInputValue(item), submitting: false });
+  };
+
+  const cancelRename = (): void => setRenameState(null);
+
+  const commitRename = async (): Promise<void> => {
+    const current = renameState;
+    if (current === null || current.submitting) {
+      return;
+    }
+    const nextValue = current.value.trim();
+    if (nextValue.length === 0 || nextValue === renameInputValue(current.item)) {
+      cancelRename();
+      return;
+    }
+    const nextName = renameFileName(current.item, nextValue);
+    setRenameState({ ...current, submitting: true });
+    const succeeded = await props.onRenameItem(current.item, nextName);
+    if (succeeded) {
+      setRenameState(null);
+    } else {
+      setRenameState((latest) => (latest === null ? null : { ...latest, submitting: false }));
+    }
+  };
+
+  const updateBox = (event: React.PointerEvent<HTMLElement>): void => {
+    if (selectionBox === null) {
+      return;
+    }
+    const next = { ...selectionBox, currentX: event.clientX, currentY: event.clientY };
+    setSelectionBox(next);
+    const paths = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(".item-card"))
+      .filter((element) => intersects(next, element.getBoundingClientRect()))
+      .flatMap((element) =>
+        element.dataset["itemPath"] === undefined ? [] : [element.dataset["itemPath"]],
+      );
+    props.onBoxSelect(paths);
+  };
+
+  const contextActions: readonly ContextMenuAction[] =
+    contextMenu === null
+      ? []
+      : contextMenu.item.kind === "group"
+        ? [
+            {
+              icon: <FolderInput size={16} />,
+              label: "\u79fb\u52a8",
+              onClick: props.onMove,
+              ...(props.moveTargets.length === 0
+                ? {}
+                : {
+                    children: moveTargetActions(
+                      props.moveTargets,
+                      contextMenu.selectedItems,
+                      props.onMoveTo,
+                    ),
+                  }),
+            },
+            {
+              icon: <LogIn size={16} />,
+              label: "\u8fdb\u5165\u7ec4",
+              onClick: () => props.onEnterGroup(contextMenu.item),
+            },
+            {
+              icon: <Ungroup size={16} />,
+              label: "\u89e3\u6563\u7ec4",
+              onClick: props.onDissolveGroup,
+            },
+            {
+              disabled: true,
+              icon: <Layers size={16} />,
+              label: "\u52a0\u5165\u9884\u8bbe",
+              onClick: props.onAddToPreset,
+            },
+            {
+              icon: <Pencil size={16} />,
+              label: "\u91cd\u547d\u540d",
+              onClick: () => beginRename(contextMenu.item),
+            },
+            {
+              icon: <Trash2 size={16} />,
+              label: "\u5220\u9664",
+              onClick: props.onRecycle,
+              kind: "delete",
+            },
+          ]
+        : [
+            {
+              icon: <FolderInput size={16} />,
+              label: "\u79fb\u52a8",
+              onClick: props.onMove,
+              ...(props.moveTargets.length === 0
+                ? {}
+                : {
+                    children: moveTargetActions(
+                      props.moveTargets,
+                      contextMenu.selectedItems,
+                      props.onMoveTo,
+                    ),
+                  }),
+            },
+            {
+              disabled:
+                contextMenu.selectedItems.length < 2 ||
+                !contextMenu.selectedItems.every((item) => item.kind === "patch"),
+              icon: <Boxes size={16} />,
+              label: "\u6253\u7ec4",
+              onClick: props.onCreateGroup,
+            },
+            {
+              disabled: !contextMenu.selectedItems.every((item) => item.kind === "patch"),
+              icon: <Layers size={16} />,
+              label: "\u52a0\u5165\u9884\u8bbe",
+              onClick: props.onAddToPreset,
+            },
+            {
+              icon: <Pencil size={16} />,
+              label: "\u91cd\u547d\u540d",
+              onClick: () => beginRename(contextMenu.item),
+            },
+            {
+              icon: <FolderOpen size={16} />,
+              label: "\u6e90\u6587\u4ef6",
+              onClick: () => props.onRevealSource(contextMenu.item.relativePath),
+            },
+            {
+              icon: <Trash2 size={16} />,
+              label: "\u5220\u9664",
+              onClick: props.onRecycle,
+              kind: "delete",
+            },
+          ];
+
+  return (
+    <main
+      className="patch-workspace"
+      aria-label="补丁工作区"
+      onPointerDown={(event) => {
+        if (
+          event.button === 0 &&
+          renameState !== null &&
+          !(event.target instanceof Element && event.target.closest(".item-title-edit") !== null)
+        ) {
+          void commitRename();
+        }
+        if (event.button !== 0 || isSelectionExcludedTarget(event.target)) {
+          return;
+        }
+        event.preventDefault();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        setSelectionBox({
+          currentX: event.clientX,
+          currentY: event.clientY,
+          startX: event.clientX,
+          startY: event.clientY,
+        });
+        props.onBoxSelect([]);
+      }}
+      onPointerMove={updateBox}
+      onPointerUp={() => setSelectionBox(null)}
+      onPointerCancel={() => setSelectionBox(null)}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        if (!props.readOnly && event.dataTransfer.files.length > 0) {
+          props.onImportDropped(Array.from(event.dataTransfer.files));
+        }
+      }}
+      onKeyDown={(event) => {
+        if (props.readOnly || props.operationBusy) {
+          return;
+        }
+        if (
+          event.target instanceof HTMLElement &&
+          (event.target.closest("input, textarea, select") !== null ||
+            event.target.closest(".item-context-menu") !== null)
+        ) {
+          return;
+        }
+        const selected = props.selectedItems;
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          event.key.toLocaleLowerCase() === "g" &&
+          selected.length >= 2 &&
+          selected.every((item) => item.kind === "patch")
+        ) {
+          event.preventDefault();
+          props.onCreateGroup();
+          return;
+        }
+        if (event.key === "F2" && selected.length === 1) {
+          event.preventDefault();
+          const [item] = selected;
+          if (item !== undefined) {
+            beginRename(item);
+          }
+          return;
+        }
+        if (event.key === "Delete" && selected.length > 0) {
+          event.preventDefault();
+          props.onRecycle();
+        }
+      }}
+      onContextMenu={(event) => {
+        if (event.target === event.currentTarget) {
+          event.preventDefault();
+          setContextMenu(null);
+        }
+      }}
+      tabIndex={-1}
+    >
+      <div className="workspace-heading">
+        <div className="workspace-heading-actions">
+          <label className="search-field workspace-search-field">
+            <Search size={16} aria-hidden="true" />
+            <input
+              aria-label="搜索补丁"
+              className="workspace-search-input"
+              onChange={(event) => props.onQueryChange(event.currentTarget.value)}
+              placeholder="搜索补丁或组"
+              type="search"
+              value={props.query}
+            />
+          </label>
+          <fieldset className="view-mode-control" aria-label="项目视图">
+            <button
+              aria-label="网格视图"
+              aria-pressed={props.viewMode === "grid"}
+              onClick={() => props.onViewModeChange("grid")}
+              type="button"
+            >
+              <Grid2X2 size={15} />
+            </button>
+            <button
+              aria-label="列表视图"
+              aria-pressed={props.viewMode === "list"}
+              onClick={() => props.onViewModeChange("list")}
+              type="button"
+            >
+              <List size={16} />
+            </button>
+          </fieldset>
+          {props.showDescendantToggle ? (
+            <label className="descendant-toggle" title="同时显示当前分类下所有子分类中的补丁">
+              <input
+                aria-label="包含子分类"
+                checked={props.includeDescendants}
+                onChange={(event) => props.onIncludeDescendantsChange(event.currentTarget.checked)}
+                type="checkbox"
+              />
+              <span>包含子分类</span>
+            </label>
+          ) : null}
+        </div>
+      </div>
+      <fieldset className="enabled-filter-control" aria-label="启用状态">
+        <button
+          aria-pressed={props.enabledFilter === "all"}
+          onClick={() => props.onEnabledFilterChange("all")}
+          type="button"
+        >
+          全部 {props.enabledCounts.all}
+        </button>
+        <button
+          aria-pressed={props.enabledFilter === "enabled"}
+          onClick={() => props.onEnabledFilterChange("enabled")}
+          type="button"
+        >
+          已启用 {props.enabledCounts.enabled}
+        </button>
+        <button
+          aria-pressed={props.enabledFilter === "disabled"}
+          onClick={() => props.onEnabledFilterChange("disabled")}
+          type="button"
+        >
+          未启用 {props.enabledCounts.disabled}
+        </button>
+        {props.onReturnFromGroup === undefined ? null : (
+          <button onClick={props.onReturnFromGroup} type="button">
+            返回组
+          </button>
+        )}
+      </fieldset>
+      {props.loading ? (
+        <section className="empty-state" aria-label="正在扫描补丁库">
+          <div className="empty-state-content">
+            <PackageOpen className="spin" size={28} />
+            <h3>正在读取补丁库</h3>
+          </div>
+        </section>
+      ) : props.visibleItems.length === 0 ? (
+        <section className="empty-state" aria-label="无匹配项目">
+          <div className="empty-state-content">
+            <div className="empty-icon">
+              <Search size={26} />
+            </div>
+            <h3>{props.items.length === 0 ? "补丁库还是空的" : "没有符合条件的项目"}</h3>
+            <p>
+              {props.items.length === 0
+                ? "将 NPK 文件拖入此处开始整理。"
+                : "调整搜索词或状态筛选。"}
+            </p>
+          </div>
+        </section>
+      ) : (
+        <section
+          className={props.viewMode === "grid" ? "item-grid" : "item-list"}
+          aria-label="补丁项目"
+          data-card-size={props.cardSize}
+        >
+          {props.visibleItems.map((item) => {
+            const itemKey = workspaceItemKey(item);
+            const selected = props.selectedPaths.includes(itemKey);
+            const location = itemLocation(item, props.categoryPath);
+            const groupDropTarget = groupDropTargetPath === itemKey;
+            return (
+              <div
+                className="item-card-shell"
+                data-renaming={
+                  renameState !== null && workspaceItemKey(renameState.item) === itemKey
+                }
+                key={itemKey}
+              >
+                <button
+                  aria-label={
+                    location === null ? item.name : `${item.name} - ${itemCategoryPath(item)}`
+                  }
+                  aria-pressed={selected}
+                  className="item-card"
+                  data-enabled={item.enabled}
+                  data-item-drop-target={groupDropTarget ? "true" : undefined}
+                  data-item-path={itemKey}
+                  data-kind={item.kind}
+                  draggable
+                  onDragStart={(event) => {
+                    const draggedItems = selected ? props.selectedItems : [item];
+                    if (!selected) {
+                      props.onSelect(itemKey, { range: false, toggle: false });
+                    }
+                    const dragPreview =
+                      event.currentTarget.parentElement?.querySelector<HTMLElement>(
+                        ".item-drag-preview",
+                      );
+                    if (
+                      dragPreview !== null &&
+                      dragPreview !== undefined &&
+                      typeof event.dataTransfer.setDragImage === "function"
+                    ) {
+                      event.dataTransfer.setDragImage(dragPreview, 22, 22);
+                    }
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData(
+                      LIBRARY_ITEMS_DRAG_TYPE,
+                      encodeWorkspaceItemDrag(draggedItems.map(workspaceItemReference)),
+                    );
+                  }}
+                  onDragEnter={(event) => {
+                    if (
+                      item.kind !== "group" ||
+                      props.readOnly ||
+                      props.operationBusy ||
+                      !isWorkspaceItemsDrag(event.dataTransfer)
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setGroupDropTargetPath(itemKey);
+                  }}
+                  onDragLeave={(event) => {
+                    if (
+                      event.relatedTarget instanceof Node &&
+                      event.currentTarget.contains(event.relatedTarget)
+                    ) {
+                      return;
+                    }
+                    setGroupDropTargetPath((current) => (current === itemKey ? null : current));
+                  }}
+                  onDragOver={(event) => {
+                    if (
+                      item.kind !== "group" ||
+                      props.readOnly ||
+                      props.operationBusy ||
+                      !isWorkspaceItemsDrag(event.dataTransfer)
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setGroupDropTargetPath(itemKey);
+                  }}
+                  onDrop={(event) => {
+                    if (item.kind !== "group") return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setGroupDropTargetPath(null);
+                    if (props.readOnly || props.operationBusy) return;
+                    const patches = decodeWorkspaceItemDrag(
+                      event.dataTransfer.getData(LIBRARY_ITEMS_DRAG_TYPE),
+                    ).filter((draggedItem) => draggedItem.kind === "patch");
+                    if (patches.length > 0) props.onAddGroupMembers(item.id, patches);
+                  }}
+                  onClick={(event) =>
+                    props.onSelect(itemKey, {
+                      range: event.shiftKey,
+                      toggle: event.ctrlKey || event.metaKey,
+                    })
+                  }
+                  onDoubleClick={(event) => {
+                    if (event.target instanceof Element && event.target.closest(".item-preview")) {
+                      props.onSelectPreview(item);
+                    } else if (item.kind === "group") {
+                      beginRename(item);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) {
+                      return;
+                    }
+                    if (event.key === "F2" && !props.readOnly && !props.operationBusy) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      beginRename(item);
+                      return;
+                    }
+                    if (event.key === "Delete" && !props.readOnly && !props.operationBusy) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (!selected) {
+                        props.onSelect(itemKey, { range: false, toggle: false });
+                      }
+                      props.onRecycle();
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      props.onSelect(itemKey, { range: false, toggle: false });
+                    }
+                  }}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    if (props.readOnly) return;
+                    if (!selected) {
+                      props.onSelect(itemKey, { range: false, toggle: false });
+                    }
+                    setContextMenu({
+                      item,
+                      selectedItems: selected ? props.selectedItems : [item],
+                      x: event.clientX,
+                      y: event.clientY,
+                    });
+                  }}
+                  title={itemCategoryPath(item)}
+                  type="button"
+                >
+                  <span className="item-preview">
+                    {item.previewUrl === null ? (
+                      item.kind === "group" ? (
+                        <Box size={30} />
+                      ) : (
+                        <PackageOpen size={30} />
+                      )
+                    ) : (
+                      <img
+                        alt={`${item.name} 预览`}
+                        className="item-preview-image"
+                        src={item.previewUrl}
+                      />
+                    )}
+                  </span>
+                  <span className="item-card-body">
+                    <span className="item-name-cell">
+                      <span className="item-title">{item.name}</span>
+                      {location === null ? null : <span className="item-location">{location}</span>}
+                    </span>
+                    <span className="item-type">{itemType(item)}</span>
+                    <span className="item-meta">{itemDescription(item)}</span>
+                    <span className="item-date">{itemDate(item)}</span>
+                  </span>
+                </button>
+                <span aria-hidden="true" className="item-drag-preview">
+                  {item.kind === "group" ? <Box size={22} /> : <PackageOpen size={22} />}
+                  {selected && props.selectedItems.length > 1 ? (
+                    <span className="item-drag-preview-count">{props.selectedItems.length}</span>
+                  ) : null}
+                </span>
+                <span aria-hidden="true" className="item-preview-hover-zone">
+                  <span className="item-preview-hover-dot" />
+                  {item.previewUrl === null ? null : (
+                    <img alt="" className="item-preview-hover-image" src={item.previewUrl} />
+                  )}
+                </span>
+                {renameState !== null && workspaceItemKey(renameState.item) === itemKey ? (
+                  <input
+                    ref={renameInputRef}
+                    aria-label={`重命名 ${item.name}`}
+                    className="item-title-edit"
+                    disabled={renameState.submitting}
+                    onBlur={() => void commitRename()}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value;
+                      setRenameState((current) =>
+                        current === null ? null : { ...current, value },
+                      );
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void commitRename();
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        cancelRename();
+                      }
+                    }}
+                    value={renameState.value}
+                  />
+                ) : null}
+                <label
+                  className="switch"
+                  title={item.enabled ? "\u505c\u7528\u8865\u4e01" : "\u542f\u7528\u8865\u4e01"}
+                >
+                  <input
+                    aria-label={`${item.enabled ? "\u505c\u7528" : "\u542f\u7528"} ${item.name}`}
+                    checked={item.enabled}
+                    disabled={props.readOnly || props.operationBusy}
+                    onChange={(event) => props.onSetItemEnabled(item, event.currentTarget.checked)}
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    type="checkbox"
+                  />
+                  <span className="slider" />
+                </label>
+              </div>
+            );
+          })}
+          {selectionBox === null ? null : (
+            <span
+              className="selection-box"
+              style={{
+                height: Math.abs(selectionBox.currentY - selectionBox.startY),
+                left: Math.min(selectionBox.startX, selectionBox.currentX),
+                top: Math.min(selectionBox.startY, selectionBox.currentY),
+                width: Math.abs(selectionBox.currentX - selectionBox.startX),
+              }}
+            />
+          )}
+        </section>
+      )}
+      {contextMenu === null ? null : (
+        <ContextMenu
+          actions={contextActions}
+          disabled={props.operationBusy || props.readOnly}
+          onClose={() => setContextMenu(null)}
+          x={contextMenu.x}
+          y={contextMenu.y}
+        />
+      )}
+    </main>
+  );
+}

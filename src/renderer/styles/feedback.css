@@ -1,0 +1,46 @@
+.toast-viewport {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 20;
+  width: min(360px, calc(100vw - 36px));
+}
+
+.toast {
+  min-height: 44px;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  background: var(--color-elevated);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.46);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.toast[data-tone="success"] svg {
+  color: var(--color-success);
+}
+
+.toast[data-tone="warning"] svg {
+  color: var(--color-warning);
+}
+
+.toast[data-tone="info"] svg {
+  color: var(--color-info);
+}
+
+.toast[data-tone="error"] svg {
+  color: var(--color-error);
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

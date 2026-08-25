@@ -1,0 +1,342 @@
+import { mkdir, stat } from "node:fs/promises";
+import { win32 } from "node:path";
+import { type BrowserWindow, ipcMain, shell } from "electron";
+import type { ZodType } from "zod";
+import {
+  createLibraryLifecycleService,
+  dissolveGroupLifecycle,
+} from "../../core/application/library-lifecycle-service";
+import { createManagedImageAssets } from "../../core/assets/managed-image-assets";
+import { createAsyncMutex } from "../../core/concurrency/async-mutex";
+import { configureTransactionRecovery } from "../../core/filesystem/file-transaction";
+import { createVirtualGroupService } from "../../core/groups/group-service";
+import { migrateLegacyGroups } from "../../core/groups/legacy-group-migration";
+import {
+  createInstallationStateStore,
+  readInstallationState,
+} from "../../core/install/installation-state";
+import { createCategoryOrderService } from "../../core/library/category-order-service";
+import { createLibraryCommands } from "../../core/library/library-commands";
+import { scanCategory, scanGroup } from "../../core/library/scanner";
+import { resolveLibraryPath } from "../../core/paths/library-path";
+import { createPreviewService } from "../../core/previews/preview-service";
+import { createPreviewStateStore } from "../../core/previews/preview-state";
+import { createRecycleService } from "../../core/recycle/recycle-service";
+import { emptyInstallationState, emptyPreviewState } from "../../core/state/schemas";
+import { createWallpaperService } from "../../core/wallpapers/wallpaper-service";
+import { createWallpaperStateStore } from "../../core/wallpapers/wallpaper-state";
+import {
+  AddGroupMembersRequestSchema,
+  type ApiResult,
+  CreateGroupRequestSchema,
+  DissolveGroupRequestSchema,
+  EmptyRecycleRequestSchema,
+  InstallBatchRequestSchema,
+  InstallRequestSchema,
+  IPC_CHANNELS,
+  OpenExternalUrlRequestSchema,
+  RecycleBatchRequestSchema,
+  RecycleRequestSchema,
+  RestoreRequestSchema,
+  RevealPatchRequestSchema,
+  ScanGroupRequestSchema,
+  ScanRequestSchema,
+} from "../../shared/ipc-contracts";
+import type { AppPaths } from "../app-paths";
+import { apiError, toApiResult } from "./api-result";
+import { registerAppearanceIpc } from "./appearance-ipc";
+import { registerCategoryCommandIpc } from "./category-command-ipc";
+import { registerCategoryTransferIpc } from "./category-transfer-ipc";
+import {
+  decorateGroupSnapshotWithInstallation,
+  decorateGroupSnapshotWithPreviews,
+  decorateSnapshotWithInstallation,
+  decorateSnapshotWithPreviews,
+} from "./decorate-snapshot";
+import { registerGameDirectoryIpc } from "./game-directory-ipc";
+import { registerMoveIpc } from "./move-ipc";
+import { registerPresetIpc } from "./preset-ipc";
+import { registerPreviewIpc } from "./preview-ipc";
+import { inspectRecoveryState, registerRecoveryMode } from "./recovery-mode";
+import { createValidatedHandler } from "./validated-handler";
+import { registerWindowControlsIpc } from "./window-controls-ipc";
+
+function register<T, U>(
+  channel: string,
+  schema: ZodType<T>,
+  action: (request: T) => Promise<ApiResult<U>>,
+): void {
+  ipcMain.removeHandler(channel);
+  const handler = createValidatedHandler(schema, action);
+  ipcMain.handle(channel, (_event, input: unknown) => handler(input));
+}
+
+export async function registerIpc(window: BrowserWindow, paths: AppPaths): Promise<void> {
+  await Promise.all([
+    mkdir(paths.dataRoot, { recursive: true }),
+    mkdir(paths.libraryRoot, { recursive: true }),
+  ]);
+  const recoveryState = await inspectRecoveryState(paths);
+  configureTransactionRecovery(paths.dataRoot);
+  registerWindowControlsIpc(window);
+  const installationStore = createInstallationStateStore(
+    win32.join(paths.dataRoot, "installation-state.json"),
+  );
+  const groups = createVirtualGroupService({
+    dataRoot: paths.dataRoot,
+    libraryRoot: paths.libraryRoot,
+  });
+  const commands = createLibraryCommands({ dataRoot: paths.dataRoot, groups });
+  const previewAssets = createManagedImageAssets({
+    assetsRoot: win32.join(paths.dataRoot, "previews"),
+    kind: "preview",
+  });
+  const previewStore = createPreviewStateStore(win32.join(paths.dataRoot, "previews.json"));
+  const previews = createPreviewService({
+    assets: previewAssets,
+    store: previewStore,
+  });
+  const legacyMigration = await migrateLegacyGroups({
+    groups,
+    libraryRoot: paths.libraryRoot,
+    previews,
+  });
+  if (!legacyMigration.ok) {
+    console.error("Legacy patch-group migration failed", legacyMigration.error);
+  }
+  const patchPreviewMigration = await previews.migratePatchBindingsToLibrary(paths.libraryRoot);
+  if (!patchPreviewMigration.ok) {
+    console.error("Legacy patch preview migration failed", patchPreviewMigration.error);
+  }
+  const wallpaperAssets = createManagedImageAssets({
+    assetsRoot: win32.join(paths.dataRoot, "wallpapers"),
+    kind: "wallpaper",
+  });
+  const wallpaper = createWallpaperService({
+    assets: wallpaperAssets,
+    store: createWallpaperStateStore(win32.join(paths.dataRoot, "wallpapers.json")),
+  });
+  const recycle = createRecycleService({ ...paths, groups, previews });
+  const categoryOrder = createCategoryOrderService(
+    win32.join(paths.dataRoot, "category-order.json"),
+  );
+  registerCategoryTransferIpc({ categoryOrder, paths });
+  registerCategoryCommandIpc(paths);
+
+  const mutationMutex = createAsyncMutex();
+  const binding = await registerGameDirectoryIpc(window, paths, mutationMutex, groups);
+  const { getInstallService } = binding;
+  registerPresetIpc({ getInstallService, mutationMutex, paths });
+  registerAppearanceIpc({ binding, mutationMutex, wallpaper, window });
+  registerPreviewIpc({ libraryRoot: paths.libraryRoot, mutationMutex, previews, window });
+
+  register(IPC_CHANNELS.scan, ScanRequestSchema, async (request) => {
+    const savedOrders = await categoryOrder.getAll();
+    if (!savedOrders.ok && !recoveryState.readOnly) {
+      return { ok: false, error: apiError(savedOrders.error.code) };
+    }
+    const [scanned, installation, previewState, groupState] = await Promise.all([
+      scanCategory(paths.libraryRoot, request.relativePath, {
+        includeDescendants: request.includeDescendants,
+        savedOrders: savedOrders.ok ? savedOrders.value : {},
+        groups,
+      }),
+      readInstallationState(installationStore),
+      previews.read(),
+      groups.list(),
+    ]);
+    if (!scanned.ok) {
+      return toApiResult(scanned);
+    }
+    if (!installation.ok && !recoveryState.readOnly) {
+      return { ok: false, error: apiError(installation.error.code) };
+    }
+    if (!previewState.ok && !recoveryState.readOnly) {
+      return { ok: false, error: apiError(previewState.error.code) };
+    }
+    if (!groupState.ok && !recoveryState.readOnly) {
+      return { ok: false, error: apiError(groupState.error.code) };
+    }
+    const groupMemberPaths = new Map(
+      groupState.ok
+        ? groupState.value.groups.map((group) => [group.id, group.memberRelativePaths] as const)
+        : [],
+    );
+    const installed = decorateSnapshotWithInstallation(
+      scanned.value,
+      installation.ok ? installation.value.state : emptyInstallationState(),
+      groupMemberPaths,
+    );
+    return toApiResult(
+      decorateSnapshotWithPreviews(
+        installed,
+        previewState.ok ? previewState.value : emptyPreviewState(),
+        previewAssets,
+      ),
+    );
+  });
+
+  register(IPC_CHANNELS.scanGroup, ScanGroupRequestSchema, async ({ groupId }) => {
+    const [scanned, installation, previewState] = await Promise.all([
+      scanGroup(paths.libraryRoot, groupId, { groups }),
+      readInstallationState(installationStore),
+      previews.read(),
+    ]);
+    if (!scanned.ok) return toApiResult(scanned);
+    if (!installation.ok && !recoveryState.readOnly) {
+      return { ok: false, error: apiError(installation.error.code) };
+    }
+    if (!previewState.ok && !recoveryState.readOnly) {
+      return { ok: false, error: apiError(previewState.error.code) };
+    }
+    const installed = decorateGroupSnapshotWithInstallation(
+      scanned.value,
+      installation.ok ? installation.value.state : emptyInstallationState(),
+    );
+    return toApiResult(
+      decorateGroupSnapshotWithPreviews(
+        installed,
+        previewState.ok ? previewState.value : emptyPreviewState(),
+        previewAssets,
+      ),
+    );
+  });
+
+  register(IPC_CHANNELS.revealPatch, RevealPatchRequestSchema, async ({ relativePath }) => {
+    if (win32.extname(relativePath).toLocaleLowerCase() !== ".npk") {
+      return { ok: false, error: apiError("INVALID_INPUT") };
+    }
+    const source = resolveLibraryPath(paths.libraryRoot, relativePath);
+    if (!source.ok) {
+      return { ok: false, error: apiError("INVALID_INPUT") };
+    }
+    try {
+      const metadata = await stat(source.value);
+      if (!metadata.isFile()) {
+        return { ok: false, error: apiError("TARGET_MISSING") };
+      }
+      shell.showItemInFolder(source.value);
+      return { ok: true, value: { revealed: true } };
+    } catch {
+      return { ok: false, error: apiError("TARGET_MISSING") };
+    }
+  });
+
+  register(IPC_CHANNELS.openExternalUrl, OpenExternalUrlRequestSchema, async ({ url }) => {
+    try {
+      await shell.openExternal(url);
+      return { ok: true, value: null };
+    } catch {
+      return { ok: false, error: apiError("OPEN_EXTERNAL_FAILED") };
+    }
+  });
+
+  register(IPC_CHANNELS.createGroup, CreateGroupRequestSchema, async (request) =>
+    toApiResult(await commands.createGroup({ ...request, libraryRoot: paths.libraryRoot })),
+  );
+
+  register(IPC_CHANNELS.addGroupMembers, AddGroupMembersRequestSchema, async (request) =>
+    mutationMutex.runExclusive(async () => {
+      const result = await groups.addMembers(request.groupId, request.patchRelativePaths);
+      return toApiResult(result);
+    }),
+  );
+
+  register(IPC_CHANNELS.dissolveGroup, DissolveGroupRequestSchema, async (request) =>
+    mutationMutex.runExclusive(async () => {
+      const result = await dissolveGroupLifecycle({
+        groupId: request.groupId,
+        groups,
+        previews,
+      });
+      return toApiResult(result);
+    }),
+  );
+
+  registerMoveIpc({ getInstallService, mutationMutex, paths, previews, recycle });
+
+  register(IPC_CHANNELS.recycleItem, RecycleRequestSchema, (request) =>
+    mutationMutex.runExclusive(async () => {
+      const install = getInstallService();
+      if (install.ok) {
+        const lifecycle = createLibraryLifecycleService({
+          groups,
+          libraryRoot: paths.libraryRoot,
+          install: install.value,
+          previews,
+          recycle,
+        });
+        const result = await lifecycle.recycle(request);
+        return result.ok ? { ok: true, value: { id: result.value.entry.id } } : toApiResult(result);
+      }
+      if (install.error.code !== "GAME_DIRECTORY_REQUIRED") {
+        return install;
+      }
+      const result = await recycle.recycle(request);
+      return result.ok ? { ok: true, value: { id: result.value.entry.id } } : toApiResult(result);
+    }),
+  );
+
+  register(IPC_CHANNELS.recycleItems, RecycleBatchRequestSchema, (request) =>
+    mutationMutex.runExclusive(async () => {
+      const install = getInstallService();
+      if (!install.ok && install.error.code !== "GAME_DIRECTORY_REQUIRED") return install;
+      const result = install.ok
+        ? await createLibraryLifecycleService({
+            groups,
+            libraryRoot: paths.libraryRoot,
+            install: install.value,
+            previews,
+            recycle,
+          }).recycleMany(request.items)
+        : await recycle.recycleMany(request.items);
+      return result.ok
+        ? { ok: true, value: { ids: result.value.entries.map((entry) => entry.id) } }
+        : toApiResult(result);
+    }),
+  );
+
+  register(IPC_CHANNELS.restoreItem, RestoreRequestSchema, async (request) => {
+    const result = await recycle.restore(request);
+    return toApiResult(result);
+  });
+
+  register(IPC_CHANNELS.emptyRecycle, EmptyRecycleRequestSchema, async (request) =>
+    toApiResult(await recycle.empty(request)),
+  );
+
+  ipcMain.removeHandler(IPC_CHANNELS.listRecycle);
+  ipcMain.handle(IPC_CHANNELS.listRecycle, async () => {
+    const result = await recycle.list();
+    return result.ok ? { ok: true, value: { items: result.value } } : toApiResult(result);
+  });
+
+  register(IPC_CHANNELS.enableItem, InstallRequestSchema, (request) =>
+    mutationMutex.runExclusive(async () => {
+      const install = getInstallService();
+      return install.ok ? toApiResult(await install.value.enable(request)) : install;
+    }),
+  );
+
+  register(IPC_CHANNELS.disableItem, InstallRequestSchema, (request) =>
+    mutationMutex.runExclusive(async () => {
+      const install = getInstallService();
+      return install.ok ? toApiResult(await install.value.disable(request)) : install;
+    }),
+  );
+
+  register(IPC_CHANNELS.enableItems, InstallBatchRequestSchema, (request) =>
+    mutationMutex.runExclusive(async () => {
+      const install = getInstallService();
+      return install.ok ? toApiResult(await install.value.enableMany(request.items)) : install;
+    }),
+  );
+
+  register(IPC_CHANNELS.disableItems, InstallBatchRequestSchema, (request) =>
+    mutationMutex.runExclusive(async () => {
+      const install = getInstallService();
+      return install.ok ? toApiResult(await install.value.disableMany(request.items)) : install;
+    }),
+  );
+  registerRecoveryMode(recoveryState);
+}

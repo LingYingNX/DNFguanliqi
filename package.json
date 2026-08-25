@@ -1,0 +1,81 @@
+{
+  "name": "dnf-patch-manager-rewrite",
+  "version": "1.2.1",
+  "description": "DNF patch manager desktop application rewrite",
+  "type": "module",
+  "main": "out/main/main.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "pnpm build && playwright test",
+    "build": "electron-vite build",
+    "dist:portable": "pnpm build && electron-builder --win portable --x64 --publish never",
+    "verify:portable": "node scripts/verify-portable.mjs",
+    "verify:packaged": "node scripts/verify-packaged.mjs",
+    "doctor": "npx react-doctor@latest"
+  },
+  "build": {
+    "appId": "com.local.dnf-patch-manager.rewrite",
+    "productName": "DNF补丁管理器",
+    "electronDist": "node_modules/electron/dist",
+    "asar": true,
+    "compression": "maximum",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "DNF补丁管理器-${version}-portable.${ext}"
+    }
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.4",
+    "@playwright/test": "^1.58.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "6.0.3",
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "jsdom": "^27.0.0",
+    "react-doctor": "^0.7.8",
+    "typescript": "^5.9.3",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
+  },
+  "packageManager": "pnpm@11.5.2",
+  "engines": {
+    "node": ">=24"
+  }
+}
