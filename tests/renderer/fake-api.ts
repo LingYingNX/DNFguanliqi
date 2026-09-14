@@ -53,13 +53,18 @@ export function createFakeApi(snapshot: CategorySnapshot): DnfApi {
     update: {
       check: async () => {
         emitUpdate({ kind: "checking" });
-        emitUpdate({ kind: "available", version: "9.9.9" });
+        emitUpdate({
+          kind: "available",
+          version: "9.9.9",
+          releaseNotes: ["新增项目地址与QQ群交流入口", "优化软件更新提示"],
+        });
         return {
           ok: true,
           value: {
             currentVersion: "1.1.0",
             latestVersion: "9.9.9",
             updateAvailable: true,
+            releaseNotes: ["新增项目地址与QQ群交流入口", "优化软件更新提示"],
           },
         };
       },

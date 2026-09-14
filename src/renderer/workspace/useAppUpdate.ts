@@ -11,6 +11,7 @@ export type AppUpdate = {
     | "downloading"
     | "failed";
   readonly latestVersion: string | null;
+  readonly releaseNotes: readonly string[];
   readonly progress: number;
   readonly message: string | null;
   readonly check: () => Promise<void>;
@@ -21,6 +22,7 @@ export type AppUpdate = {
 export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
   const [phase, setPhase] = useState<AppUpdate["phase"]>("idle");
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [releaseNotes, setReleaseNotes] = useState<readonly string[]>([]);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -35,12 +37,14 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
       if (event.kind === "available") {
         setPhase("available");
         setLatestVersion(event.version);
+        setReleaseNotes(event.releaseNotes);
         setMessage(null);
         return;
       }
       if (event.kind === "current") {
         setPhase("current");
         setLatestVersion(event.version);
+        setReleaseNotes(event.releaseNotes);
         setProgress(0);
         return;
       }
@@ -71,6 +75,7 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
         return;
       }
       setLatestVersion(result.value.latestVersion);
+      setReleaseNotes(result.value.releaseNotes);
       setPhase(result.value.updateAvailable ? "available" : "current");
     } catch {
       setPhase("failed");
@@ -104,5 +109,5 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
     }
   }, [client]);
 
-  return { phase, latestVersion, progress, message, check, download, install };
+  return { phase, latestVersion, releaseNotes, progress, message, check, download, install };
 }

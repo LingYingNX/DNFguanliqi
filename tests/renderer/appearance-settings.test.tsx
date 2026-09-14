@@ -104,6 +104,8 @@ describe("appearance settings", () => {
 
     expect(await within(settingsDialog).findByText("已检测到新版本 v9.9.9")).toBeInTheDocument();
     expect(within(settingsDialog).getByText("最新版本 v9.9.9")).toBeInTheDocument();
+    expect(within(settingsDialog).getByText("新增项目地址与QQ群交流入口")).toBeInTheDocument();
+    expect(within(settingsDialog).getByText("优化软件更新提示")).toBeInTheDocument();
 
     fireEvent.click(within(settingsDialog).getByRole("button", { name: "立即更新" }));
     await waitFor(() => expect(progress).toHaveValue(100));
@@ -118,6 +120,7 @@ describe("appearance settings", () => {
         currentVersion: "1.1.0",
         latestVersion: "1.1.0",
         updateAvailable: false,
+        releaseNotes: [],
       },
     });
     const noUpdateApi = { ...api, update: { ...api.update, check } };

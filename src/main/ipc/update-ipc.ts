@@ -17,6 +17,21 @@ const loadAutoUpdater = (): AutoUpdater =>
 
 const ok = <T>(value: T): ApiResult<T> => ({ ok: true, value });
 
+const normalizeReleaseNotes = (value: unknown): string[] => {
+  if (typeof value === "string") {
+    return value
+      .split(/\r?\n/u)
+      .map((line) => line.trim().replace(/^[-*•]\s*/u, ""))
+      .filter((line) => line.length > 0);
+  }
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null || !("note" in entry)) return [];
+    const note = entry.note;
+    return typeof note === "string" ? normalizeReleaseNotes(note) : [];
+  });
+};
+
 export function registerUpdateIpc(window: BrowserWindow, isPackaged: boolean): void {
   const updater = isPackaged ? loadAutoUpdater() : undefined;
   const publish = (event: UpdateEvent): void => {
@@ -30,9 +45,19 @@ export function registerUpdateIpc(window: BrowserWindow, isPackaged: boolean): v
     updater.installDirectory = dirname(process.execPath);
     updater.autoDownload = false;
     updater.on("checking-for-update", () => publish({ kind: "checking" }));
-    updater.on("update-available", (info) => publish({ kind: "available", version: info.version }));
+    updater.on("update-available", (info) =>
+      publish({
+        kind: "available",
+        version: info.version,
+        releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+      }),
+    );
     updater.on("update-not-available", (info) =>
-      publish({ kind: "current", version: info.version }),
+      publish({
+        kind: "current",
+        version: info.version,
+        releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+      }),
     );
     updater.on("download-progress", (progress) =>
       publish({
@@ -55,15 +80,18 @@ export function registerUpdateIpc(window: BrowserWindow, isPackaged: boolean): v
         currentVersion: APP_VERSION,
         latestVersion: APP_VERSION,
         updateAvailable: false,
+        releaseNotes: [],
       });
     }
     try {
       const checked = await updater.checkForUpdates();
       const latestVersion = checked?.updateInfo.version ?? APP_VERSION;
+      const releaseNotes = normalizeReleaseNotes(checked?.updateInfo.releaseNotes);
       return ok({
         currentVersion: APP_VERSION,
         latestVersion,
         updateAvailable: latestVersion !== APP_VERSION,
+        releaseNotes,
       });
     } catch {
       publish({ kind: "failed", message: "检查更新失败，请检查网络后重试" });

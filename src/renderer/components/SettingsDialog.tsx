@@ -78,13 +78,6 @@ const PROJECT_LINKS = [
   },
 ] as const;
 
-const CHANGELOG = [
-  "重构设置中心，支持常规设置、推荐内容与关于软件导航。",
-  "优化补丁预览图读取与替换流程，减少缓存导致的显示错误。",
-  "改进分类、组和补丁卡片的交互与布局表现。",
-  "修复若干启动、扫描和文件同步问题。",
-] as const;
-
 const UPDATE_STATUS: Record<AppUpdate["phase"], string> = {
   idle: "点击检查更新获取最新版本",
   checking: "正在检查更新",
@@ -224,9 +217,11 @@ export function SettingsDialog(props: Props): React.JSX.Element {
                   </div>
                   <div className="settings-changelog-heading">更新说明</div>
                   <ul className="settings-changelog">
-                    {CHANGELOG.map((entry) => (
-                      <li key={entry}>{entry}</li>
-                    ))}
+                    {update.releaseNotes.length > 0 ? (
+                      update.releaseNotes.map((entry) => <li key={entry}>{entry}</li>)
+                    ) : (
+                      <li>暂无发行说明</li>
+                    )}
                   </ul>
                   <div className="settings-update-footer">
                     <div className="settings-progress-info">

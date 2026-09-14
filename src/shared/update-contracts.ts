@@ -4,13 +4,22 @@ export const UpdateCheckResultSchema = z.object({
   currentVersion: z.string(),
   latestVersion: z.string(),
   updateAvailable: z.boolean(),
+  releaseNotes: z.array(z.string()),
 });
 export type UpdateCheckResult = z.infer<typeof UpdateCheckResultSchema>;
 
 export const UpdateEventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("checking") }),
-  z.object({ kind: z.literal("available"), version: z.string() }),
-  z.object({ kind: z.literal("current"), version: z.string() }),
+  z.object({
+    kind: z.literal("available"),
+    version: z.string(),
+    releaseNotes: z.array(z.string()),
+  }),
+  z.object({
+    kind: z.literal("current"),
+    version: z.string(),
+    releaseNotes: z.array(z.string()),
+  }),
   z.object({
     kind: z.literal("downloading"),
     percent: z.number().min(0).max(100),
