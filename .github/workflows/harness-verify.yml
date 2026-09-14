@@ -1,0 +1,22 @@
+name: Harness Verification
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-harness:
+    name: Verify Harness Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Verify harness
+        run: bash scripts/verify-harness.sh --platform=github --format=github
