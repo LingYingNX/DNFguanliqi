@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag version
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ github.ref_name }}".TrimStart("v")
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($tagVersion -ne $packageVersion) {
+            throw "Git tag $tagVersion does not match package.json version $packageVersion"
+          }
+
+      - name: Build and publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm run release
