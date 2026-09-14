@@ -21,11 +21,12 @@ describe("appearance settings", () => {
       "true",
     );
     expect(within(settingsDialog).getByText("游戏目录")).toBeInTheDocument();
+    fireEvent.click(within(settingsDialog).getByRole("tab", { name: "关于软件" }));
     expect(
       within(settingsDialog).queryByRole("heading", { name: "支持与社区" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(within(settingsDialog).getByRole("tab", { name: "关于软件" }));
-    expect(within(settingsDialog).getByRole("heading", { name: "支持与社区" })).toBeInTheDocument();
+    expect(within(settingsDialog).getByRole("button", { name: "项目地址" })).toBeInTheDocument();
+    expect(within(settingsDialog).getByRole("button", { name: "QQ群交流" })).toBeInTheDocument();
     expect(within(settingsDialog).getByText("请作者喝杯咖啡 ☕")).toBeInTheDocument();
     expect(within(settingsDialog).getByText("哔哩哔哩主页")).toBeInTheDocument();
     expect(within(settingsDialog).getByRole("button", { name: "去赞助" })).toBeInTheDocument();
@@ -64,6 +65,20 @@ describe("appearance settings", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "设置" }));
     fireEvent.click(screen.getByRole("tab", { name: "关于软件" }));
+    fireEvent.click(screen.getByRole("button", { name: "项目地址" }));
+    await waitFor(() =>
+      expect(openExternalUrl).toHaveBeenLastCalledWith({
+        url: "https://github.com/LingYingNX/DNFguanliqi",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "QQ群交流" }));
+    await waitFor(() =>
+      expect(openExternalUrl).toHaveBeenLastCalledWith({
+        url: "https://qm.qq.com/q/ZxPw28W7eg",
+      }),
+    );
+
     fireEvent.click(screen.getByRole("button", { name: "去赞助" }));
     await waitFor(() =>
       expect(openExternalUrl).toHaveBeenLastCalledWith({ url: "https://afdian.com/a/naixu" }),
@@ -87,11 +102,38 @@ describe("appearance settings", () => {
     const progress = within(settingsDialog).getByRole("progressbar", { name: "更新进度" });
     fireEvent.click(within(settingsDialog).getByRole("button", { name: "检查更新" }));
 
-    expect(await within(settingsDialog).findByText("发现新版本 v9.9.9")).toBeInTheDocument();
+    expect(await within(settingsDialog).findByText("已检测到新版本 v9.9.9")).toBeInTheDocument();
+    expect(within(settingsDialog).getByText("最新版本 v9.9.9")).toBeInTheDocument();
 
     fireEvent.click(within(settingsDialog).getByRole("button", { name: "立即更新" }));
     await waitFor(() => expect(progress).toHaveValue(100));
     expect(within(settingsDialog).getByRole("button", { name: "重启安装" })).toBeInTheDocument();
+  });
+
+  it("shows the current-version message when no update is available", async () => {
+    const api = createFakeApi(WORKSPACE_SNAPSHOT);
+    const check = async () => ({
+      ok: true as const,
+      value: {
+        currentVersion: "1.1.0",
+        latestVersion: "1.1.0",
+        updateAvailable: false,
+      },
+    });
+    const noUpdateApi = { ...api, update: { ...api.update, check } };
+
+    render(<App api={noUpdateApi} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "设置" }));
+    fireEvent.click(screen.getByRole("tab", { name: "关于软件" }));
+
+    const settingsDialog = screen.getByRole("dialog", { name: "设置" });
+    fireEvent.click(within(settingsDialog).getByRole("button", { name: "检查更新" }));
+
+    expect(await within(settingsDialog).findByText("当前版本已是最新版")).toBeInTheDocument();
+    expect(within(settingsDialog).getByText("当前版本 v1.1.0")).toBeInTheDocument();
+    expect(within(settingsDialog).getByText("最新版本 v1.1.0")).toBeInTheDocument();
+    expect(within(settingsDialog).getByRole("button", { name: "立即更新" })).toBeDisabled();
   });
 
   it("keeps the close control in the content toolbar and closes on backdrop click", async () => {

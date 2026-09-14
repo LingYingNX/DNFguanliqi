@@ -415,6 +415,15 @@
   opacity: 0.48;
 }
 
+.settings-project-links {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-project-link {
+  flex: 1 1 0;
+}
+
 .settings-support-list {
   display: grid;
   grid-auto-rows: 64px;

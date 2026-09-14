@@ -86,6 +86,8 @@ export const SetGameDirectoryRequestSchema = z.object({
 export const OpenExternalUrlRequestSchema = z.object({
   url: z.union([
     z.literal("https://afdian.com/a/naixu"),
+    z.literal("https://github.com/LingYingNX/DNFguanliqi"),
+    z.literal("https://qm.qq.com/q/ZxPw28W7eg"),
     z.literal("https://space.bilibili.com/41344302"),
   ]),
 });

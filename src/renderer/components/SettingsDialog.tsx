@@ -4,20 +4,25 @@ import {
   Download,
   ExternalLink,
   Folder,
+  Github,
   Heart,
   Info,
   RefreshCw,
   Settings as SettingsIcon,
   Sparkles,
+  Users,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { APP_VERSION } from "../../shared/contracts";
 import type { AppUpdate } from "../workspace/useAppUpdate";
 import { Dialog } from "./Dialog";
 import { CommandButton } from "./primitives";
 
-type SupportUrl = "https://afdian.com/a/naixu" | "https://space.bilibili.com/41344302";
+type SupportUrl =
+  | "https://afdian.com/a/naixu"
+  | "https://github.com/LingYingNX/DNFguanliqi"
+  | "https://qm.qq.com/q/ZxPw28W7eg"
+  | "https://space.bilibili.com/41344302";
 type SettingsSection = "general" | "recommended" | "about";
 
 type Props = {
@@ -60,6 +65,19 @@ const SUPPORT_LINKS = [
   },
 ] as const;
 
+const PROJECT_LINKS = [
+  {
+    icon: Github,
+    label: "项目地址",
+    url: "https://github.com/LingYingNX/DNFguanliqi",
+  },
+  {
+    icon: Users,
+    label: "QQ群交流",
+    url: "https://qm.qq.com/q/ZxPw28W7eg",
+  },
+] as const;
+
 const CHANGELOG = [
   "重构设置中心，支持常规设置、推荐内容与关于软件导航。",
   "优化补丁预览图读取与替换流程，减少缓存导致的显示错误。",
@@ -70,8 +88,8 @@ const CHANGELOG = [
 const UPDATE_STATUS: Record<AppUpdate["phase"], string> = {
   idle: "点击检查更新获取最新版本",
   checking: "正在检查更新",
-  available: "发现新版本",
-  current: "已是最新版本",
+  available: "已检测到新版本",
+  current: "当前版本已是最新版",
   downloading: "正在下载更新",
   downloaded: "更新包下载完成",
   failed: "更新失败",
@@ -191,7 +209,7 @@ export function SettingsDialog(props: Props): React.JSX.Element {
                       <h3>软件更新</h3>
                       <span className="settings-update-status">
                         {update.phase === "available" && update.latestVersion !== null
-                          ? `发现新版本 v${update.latestVersion}`
+                          ? `已检测到新版本 v${update.latestVersion}`
                           : (update.message ?? UPDATE_STATUS[update.phase])}
                       </span>
                     </div>
@@ -200,7 +218,7 @@ export function SettingsDialog(props: Props): React.JSX.Element {
                         当前版本 v{props.currentVersion}
                       </span>
                       <span className="settings-latest-version">
-                        最新版本 v{update.latestVersion ?? APP_VERSION}
+                        最新版本 v{update.latestVersion ?? props.currentVersion}
                       </span>
                     </div>
                   </div>
@@ -257,9 +275,21 @@ export function SettingsDialog(props: Props): React.JSX.Element {
                     </div>
                   </div>
                 </article>
-                <div className="settings-detail-heading">
-                  <h3>支持与社区</h3>
-                  <p>感谢你的使用与支持，这些入口会打开对应的官方主页。</p>
+                <div className="settings-project-links">
+                  {PROJECT_LINKS.map((link) => {
+                    const LinkIcon = link.icon;
+                    return (
+                      <button
+                        className="settings-update-secondary settings-project-link"
+                        key={link.label}
+                        onClick={() => props.onOpenExternalUrl(link.url)}
+                        type="button"
+                      >
+                        <LinkIcon aria-hidden="true" size={14} />
+                        {link.label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="settings-support-list">
                   {SUPPORT_LINKS.map((link) => {
