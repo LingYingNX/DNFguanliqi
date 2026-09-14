@@ -1,0 +1,9 @@
+wing: "DNF补丁管理器"
+rooms:
+- name: general
+  description: DNF patch manager project knowledge
+  keywords:
+  - dnf
+  - electron
+  - desktop
+  - workflow

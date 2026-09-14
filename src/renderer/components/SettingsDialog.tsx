@@ -1,18 +1,45 @@
-import { Bookmark, ExternalLink, Folder, Heart } from "lucide-react";
+import {
+  Bookmark,
+  CheckCircle2,
+  Download,
+  ExternalLink,
+  Folder,
+  Heart,
+  Info,
+  RefreshCw,
+  Settings as SettingsIcon,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import { APP_VERSION } from "../../shared/contracts";
+import type { AppUpdate } from "../workspace/useAppUpdate";
 import { Dialog } from "./Dialog";
 import { CommandButton } from "./primitives";
 
 type SupportUrl = "https://afdian.com/a/naixu" | "https://space.bilibili.com/41344302";
+type SettingsSection = "general" | "recommended" | "about";
 
 type Props = {
+  readonly currentVersion: string;
   readonly gameDirectory: string | null;
   readonly gameDirectoryBusy: boolean;
   readonly onClose: () => void;
   readonly onOpenExternalUrl: (url: SupportUrl) => void;
   readonly onSelectGameDirectory: () => Promise<string | null>;
   readonly onSetGameDirectory: (value: string) => Promise<boolean>;
+  readonly update: AppUpdate;
 };
+
+const NAV_ITEMS = [
+  { icon: SettingsIcon, key: "general", label: "常规设置" },
+  { icon: Sparkles, key: "recommended", label: "推荐内容" },
+  { icon: Info, key: "about", label: "关于软件" },
+] as const satisfies readonly {
+  readonly icon: typeof SettingsIcon;
+  readonly key: SettingsSection;
+  readonly label: string;
+}[];
 
 const SUPPORT_LINKS = [
   {
@@ -33,8 +60,29 @@ const SUPPORT_LINKS = [
   },
 ] as const;
 
+const CHANGELOG = [
+  "重构设置中心，支持常规设置、推荐内容与关于软件导航。",
+  "优化补丁预览图读取与替换流程，减少缓存导致的显示错误。",
+  "改进分类、组和补丁卡片的交互与布局表现。",
+  "修复若干启动、扫描和文件同步问题。",
+] as const;
+
+const UPDATE_STATUS: Record<AppUpdate["phase"], string> = {
+  idle: "点击检查更新获取最新版本",
+  checking: "正在检查更新",
+  available: "发现新版本",
+  current: "已是最新版本",
+  downloading: "正在下载更新",
+  downloaded: "更新包下载完成",
+  failed: "更新失败",
+};
+
 export function SettingsDialog(props: Props): React.JSX.Element {
+  const [section, setSection] = useState<SettingsSection>("general");
   const [draft, setDraft] = useState(props.gameDirectory ?? "");
+  const update = props.update;
+  const progressValue =
+    update.phase === "downloaded" ? 100 : update.phase === "downloading" ? update.progress : 0;
 
   useEffect(() => {
     setDraft(props.gameDirectory ?? "");
@@ -47,80 +95,209 @@ export function SettingsDialog(props: Props): React.JSX.Element {
   };
 
   return (
-    <Dialog className="settings-dialog-panel" onClose={props.onClose} title="设置">
-      <div className="settings-dialog-body settings-only-dialog">
-        <section className="settings-path-section">
-          <label className="settings-path-label" htmlFor="game-directory">
-            游戏目录
-          </label>
-          <div className="settings-path-row">
-            <input
-              aria-label="游戏目录"
-              className="settings-path-input"
-              data-dialog-initial-focus="true"
-              disabled={props.gameDirectoryBusy}
-              id="game-directory"
-              onBlur={commit}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  commit();
-                }
-              }}
-              placeholder="请输入或粘贴游戏目录"
-              spellCheck={false}
-              type="text"
-              value={draft}
-            />
-            <CommandButton
-              aria-label="浏览"
-              className="settings-browse-button"
-              disabled={props.gameDirectoryBusy}
-              icon={<Folder size={16} />}
-              loading={props.gameDirectoryBusy}
-              onClick={async () => {
-                const selectedDirectory = await props.onSelectGameDirectory();
-                if (selectedDirectory !== null) setDraft(selectedDirectory);
-              }}
-              title="浏览游戏目录"
-            >
-              浏览
-            </CommandButton>
-          </div>
-        </section>
-        <section aria-labelledby="support-links-heading" className="settings-support-section">
-          <h3 id="support-links-heading">支持与社区</h3>
-          <div className="settings-support-list">
-            {SUPPORT_LINKS.map((link) => {
-              const PlatformIcon = link.icon;
+    <Dialog
+      backdropClassName="settings-dialog-backdrop"
+      className="settings-dialog-panel"
+      hideHeader
+      onClose={props.onClose}
+      title="设置"
+    >
+      <div className="settings-dialog-layout">
+        <aside className="settings-sidebar">
+          <nav aria-label="设置导航" className="settings-nav">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const selected = section === item.key;
               return (
-                <article className="settings-support-card" data-support={link.key} key={link.key}>
-                  <div className="settings-support-copy">
-                    <span aria-hidden="true" className="settings-support-icon">
-                      <PlatformIcon size={17} strokeWidth={1.9} />
-                    </span>
-                    <div>
-                      <strong>{link.name}</strong>
-                      <span>{link.description}</span>
-                    </div>
-                  </div>
-                  <div className="settings-support-actions">
-                    <button
-                      aria-label={link.actionLabel}
-                      className="settings-support-button"
-                      onClick={() => props.onOpenExternalUrl(link.url)}
-                      type="button"
-                    >
-                      <span>{link.actionLabel}</span>
-                      <ExternalLink aria-hidden="true" size={13} strokeWidth={2} />
-                    </button>
-                  </div>
-                </article>
+                <button
+                  aria-selected={selected}
+                  className="settings-nav-item"
+                  key={item.key}
+                  onClick={() => setSection(item.key)}
+                  role="tab"
+                  type="button"
+                >
+                  <Icon aria-hidden="true" size={16} />
+                  <span>{item.label}</span>
+                </button>
               );
             })}
+          </nav>
+        </aside>
+
+        <main className="settings-content" role="tabpanel">
+          <button
+            aria-label="关闭对话框"
+            className="settings-content-close"
+            onClick={props.onClose}
+            type="button"
+          >
+            <X aria-hidden="true" size={18} />
+          </button>
+          <div className="settings-content-body">
+            {section === "general" ? (
+              <section className="settings-detail-section">
+                <div className="settings-detail-heading">
+                  <h3>游戏目录</h3>
+                  <p>选择 DNF 游戏目录，补丁启用和文件同步会使用这个位置。</p>
+                </div>
+                <div className="settings-path-row">
+                  <input
+                    aria-label="游戏目录"
+                    className="settings-path-input"
+                    data-dialog-initial-focus="true"
+                    disabled={props.gameDirectoryBusy}
+                    id="game-directory"
+                    onBlur={commit}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        commit();
+                      }
+                    }}
+                    placeholder="请输入或粘贴游戏目录"
+                    spellCheck={false}
+                    type="text"
+                    value={draft}
+                  />
+                  <CommandButton
+                    aria-label="浏览"
+                    className="settings-browse-button"
+                    disabled={props.gameDirectoryBusy}
+                    icon={<Folder size={16} />}
+                    loading={props.gameDirectoryBusy}
+                    onClick={async () => {
+                      const selectedDirectory = await props.onSelectGameDirectory();
+                      if (selectedDirectory !== null) setDraft(selectedDirectory);
+                    }}
+                    title="浏览游戏目录"
+                  >
+                    浏览
+                  </CommandButton>
+                </div>
+              </section>
+            ) : section === "recommended" ? (
+              <section className="settings-empty-state">
+                <Sparkles aria-hidden="true" size={28} />
+                <h3>推荐内容</h3>
+                <p>推荐内容功能正在准备中，后续会在这里展示精选资源和实用功能。</p>
+              </section>
+            ) : (
+              <section className="settings-detail-section">
+                <article className="settings-update-card">
+                  <div className="settings-update-header">
+                    <div>
+                      <h3>软件更新</h3>
+                      <span className="settings-update-status">
+                        {update.phase === "available" && update.latestVersion !== null
+                          ? `发现新版本 v${update.latestVersion}`
+                          : (update.message ?? UPDATE_STATUS[update.phase])}
+                      </span>
+                    </div>
+                    <div className="settings-version-stack">
+                      <span className="settings-version-badge">
+                        当前版本 v{props.currentVersion}
+                      </span>
+                      <span className="settings-latest-version">
+                        最新版本 v{update.latestVersion ?? APP_VERSION}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="settings-changelog-heading">更新说明</div>
+                  <ul className="settings-changelog">
+                    {CHANGELOG.map((entry) => (
+                      <li key={entry}>{entry}</li>
+                    ))}
+                  </ul>
+                  <div className="settings-update-footer">
+                    <div className="settings-progress-info">
+                      <span>
+                        {update.phase === "downloading"
+                          ? `正在下载更新 (${update.progress}%)`
+                          : update.phase === "downloaded"
+                            ? "下载完成，点击重启安装"
+                            : "更新进度"}
+                      </span>
+                      <span>{progressValue}%</span>
+                    </div>
+                    <progress
+                      aria-label="更新进度"
+                      className="settings-update-progress"
+                      max={100}
+                      value={progressValue}
+                    />
+                    <div className="settings-update-actions">
+                      <button
+                        className="settings-update-secondary"
+                        disabled={update.phase === "checking" || update.phase === "downloading"}
+                        onClick={() => void update.check()}
+                        type="button"
+                      >
+                        <RefreshCw aria-hidden="true" size={14} />
+                        检查更新
+                      </button>
+                      <button
+                        className="settings-update-primary"
+                        disabled={update.phase !== "available" && update.phase !== "downloaded"}
+                        onClick={() =>
+                          void (update.phase === "downloaded"
+                            ? update.install()
+                            : update.download())
+                        }
+                        type="button"
+                      >
+                        {update.phase === "downloaded" ? (
+                          <CheckCircle2 aria-hidden="true" size={14} />
+                        ) : (
+                          <Download aria-hidden="true" size={14} />
+                        )}
+                        {update.phase === "downloaded" ? "重启安装" : "立即更新"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+                <div className="settings-detail-heading">
+                  <h3>支持与社区</h3>
+                  <p>感谢你的使用与支持，这些入口会打开对应的官方主页。</p>
+                </div>
+                <div className="settings-support-list">
+                  {SUPPORT_LINKS.map((link) => {
+                    const PlatformIcon = link.icon;
+                    return (
+                      <article
+                        className="settings-support-card"
+                        data-support={link.key}
+                        key={link.key}
+                      >
+                        <div className="settings-support-copy">
+                          <span aria-hidden="true" className="settings-support-icon">
+                            <PlatformIcon size={17} strokeWidth={1.9} />
+                          </span>
+                          <div>
+                            <strong>{link.name}</strong>
+                            <span>{link.description}</span>
+                          </div>
+                        </div>
+                        <div className="settings-support-actions">
+                          <button
+                            aria-label={link.actionLabel}
+                            className="settings-support-button"
+                            onClick={() => props.onOpenExternalUrl(link.url)}
+                            type="button"
+                          >
+                            <span>{link.actionLabel}</span>
+                            <ExternalLink aria-hidden="true" size={13} strokeWidth={2} />
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
           </div>
-        </section>
+        </main>
       </div>
     </Dialog>
   );

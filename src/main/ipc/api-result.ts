@@ -35,6 +35,9 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PRESET_ITEM_INVALID: "预设引用的文件不是有效 NPK 补丁",
   PRESET_IO: "预设文件操作失败",
   OPEN_EXTERNAL_FAILED: "无法在浏览器中打开链接",
+  UPDATE_CHECK_FAILED: "检查更新失败，请检查网络后重试",
+  UPDATE_DOWNLOAD_FAILED: "下载更新失败，请稍后重试",
+  UPDATE_UNAVAILABLE: "当前运行方式不支持自动更新，请使用安装包运行",
 };
 
 export function apiError(code: string, files: readonly string[] = []): ApiError {

@@ -1,6 +1,6 @@
 {
   "name": "dnf-patch-manager-rewrite",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "DNF patch manager desktop application rewrite",
   "type": "module",
   "main": "out/main/main.js",
@@ -16,6 +16,8 @@
     "test:e2e": "pnpm build && playwright test",
     "build": "electron-vite build",
     "dist:portable": "pnpm build && electron-builder --win portable --x64 --publish never",
+    "dist:installer": "pnpm build && electron-builder --win nsis --x64 --publish never",
+    "release": "pnpm build && electron-builder --win nsis --x64 --publish always",
     "verify:portable": "node scripts/verify-portable.mjs",
     "verify:packaged": "node scripts/verify-packaged.mjs",
     "doctor": "npx react-doctor@latest"
@@ -37,10 +39,23 @@
       "out/**/*",
       "package.json"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "LingYingNX",
+        "repo": "DNFguanliqi"
+      }
+    ],
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "dnf-patch-manager-${version}-setup.${ext}"
+    },
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
@@ -51,6 +66,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "lucide-react": "^0.468.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",

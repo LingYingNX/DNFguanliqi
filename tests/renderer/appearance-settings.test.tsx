@@ -16,12 +16,24 @@ describe("appearance settings", () => {
     fireEvent.click(await screen.findByRole("button", { name: "设置" }));
 
     const settingsDialog = screen.getByRole("dialog", { name: "设置" });
+    expect(within(settingsDialog).getByRole("tab", { name: "常规设置" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(within(settingsDialog).getByText("游戏目录")).toBeInTheDocument();
+    expect(
+      within(settingsDialog).queryByRole("heading", { name: "支持与社区" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(settingsDialog).getByRole("tab", { name: "关于软件" }));
     expect(within(settingsDialog).getByRole("heading", { name: "支持与社区" })).toBeInTheDocument();
     expect(within(settingsDialog).getByText("请作者喝杯咖啡 ☕")).toBeInTheDocument();
     expect(within(settingsDialog).getByText("哔哩哔哩主页")).toBeInTheDocument();
     expect(within(settingsDialog).getByRole("button", { name: "去赞助" })).toBeInTheDocument();
     expect(within(settingsDialog).getByRole("button", { name: "去关注" })).toBeInTheDocument();
+    expect(within(settingsDialog).getByRole("heading", { name: "软件更新" })).toBeInTheDocument();
+    expect(within(settingsDialog).getByText("更新说明")).toBeInTheDocument();
+    expect(within(settingsDialog).getByText("当前版本 v1.1.0")).toBeInTheDocument();
+    expect(within(settingsDialog).getByRole("progressbar", { name: "更新进度" })).toHaveValue(0);
     expect(within(settingsDialog).queryAllByRole("slider")).toHaveLength(0);
     expect(screen.queryByRole("dialog", { name: "调整外观" })).not.toBeInTheDocument();
 
@@ -51,6 +63,7 @@ describe("appearance settings", () => {
     render(<App api={{ ...api, openExternalUrl }} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "设置" }));
+    fireEvent.click(screen.getByRole("tab", { name: "关于软件" }));
     fireEvent.click(screen.getByRole("button", { name: "去赞助" }));
     await waitFor(() =>
       expect(openExternalUrl).toHaveBeenLastCalledWith({ url: "https://afdian.com/a/naixu" }),
@@ -62,6 +75,23 @@ describe("appearance settings", () => {
         url: "https://space.bilibili.com/41344302",
       }),
     );
+  });
+
+  it("checks for a new version and tracks the download flow", async () => {
+    render(<App api={createFakeApi(WORKSPACE_SNAPSHOT)} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "设置" }));
+    fireEvent.click(screen.getByRole("tab", { name: "关于软件" }));
+
+    const settingsDialog = screen.getByRole("dialog", { name: "设置" });
+    const progress = within(settingsDialog).getByRole("progressbar", { name: "更新进度" });
+    fireEvent.click(within(settingsDialog).getByRole("button", { name: "检查更新" }));
+
+    expect(await within(settingsDialog).findByText("发现新版本 v9.9.9")).toBeInTheDocument();
+
+    fireEvent.click(within(settingsDialog).getByRole("button", { name: "立即更新" }));
+    await waitFor(() => expect(progress).toHaveValue(100));
+    expect(within(settingsDialog).getByRole("button", { name: "重启安装" })).toBeInTheDocument();
   });
 
   it("keeps the close control in the content toolbar and closes on backdrop click", async () => {

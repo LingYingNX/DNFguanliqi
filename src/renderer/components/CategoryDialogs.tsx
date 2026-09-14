@@ -9,6 +9,7 @@ type CategoryDialogsProps = {
   readonly categoryPath: string;
   readonly createCategory: (name: string) => Promise<boolean>;
   readonly deleteCategory: () => Promise<boolean>;
+  readonly hasContents: boolean;
   readonly onClose: () => void;
   readonly renameCategory: (name: string) => Promise<boolean>;
 };
@@ -70,13 +71,21 @@ function NameDialog({
 function DeleteDialog({
   categoryPath,
   deleteCategory,
+  hasContents,
   onClose,
-}: Pick<CategoryDialogsProps, "categoryPath" | "deleteCategory" | "onClose">): React.JSX.Element {
+}: Pick<
+  CategoryDialogsProps,
+  "categoryPath" | "deleteCategory" | "hasContents" | "onClose"
+>): React.JSX.Element {
   const [deleting, setDeleting] = useState(false);
   return (
-    <Dialog onClose={onClose} title="删除分类">
+    <Dialog onClose={onClose} title="警告">
       <div className="dialog-body">
-        <p>确定删除空分类“{categoryName(categoryPath)}”？</p>
+        <p>
+          {hasContents
+            ? "当前目录下还有补丁文件，是否确认删除"
+            : `确定删除空分类“${categoryName(categoryPath)}”？`}
+        </p>
       </div>
       <div className="dialog-actions">
         <CommandButton onClick={onClose}>取消</CommandButton>
@@ -104,6 +113,7 @@ export function CategoryDialogs({
   categoryPath,
   createCategory,
   deleteCategory,
+  hasContents,
   onClose,
   renameCategory,
 }: CategoryDialogsProps): React.JSX.Element | null {
@@ -124,7 +134,12 @@ export function CategoryDialogs({
   }
   if (active === "delete") {
     return (
-      <DeleteDialog categoryPath={categoryPath} deleteCategory={deleteCategory} onClose={onClose} />
+      <DeleteDialog
+        categoryPath={categoryPath}
+        deleteCategory={deleteCategory}
+        hasContents={hasContents}
+        onClose={onClose}
+      />
     );
   }
   return null;

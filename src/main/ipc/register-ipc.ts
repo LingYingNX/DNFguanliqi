@@ -2,6 +2,7 @@ import { mkdir, stat } from "node:fs/promises";
 import { win32 } from "node:path";
 import { type BrowserWindow, ipcMain, shell } from "electron";
 import type { ZodType } from "zod";
+import { createCategoryDeleteService } from "../../core/application/category-delete-service";
 import {
   createLibraryLifecycleService,
   dissolveGroupLifecycle,
@@ -58,6 +59,7 @@ import { registerMoveIpc } from "./move-ipc";
 import { registerPresetIpc } from "./preset-ipc";
 import { registerPreviewIpc } from "./preview-ipc";
 import { inspectRecoveryState, registerRecoveryMode } from "./recovery-mode";
+import { registerUpdateIpc } from "./update-ipc";
 import { createValidatedHandler } from "./validated-handler";
 import { registerWindowControlsIpc } from "./window-controls-ipc";
 
@@ -71,7 +73,11 @@ function register<T, U>(
   ipcMain.handle(channel, (_event, input: unknown) => handler(input));
 }
 
-export async function registerIpc(window: BrowserWindow, paths: AppPaths): Promise<void> {
+export async function registerIpc(
+  window: BrowserWindow,
+  paths: AppPaths,
+  isPackaged: boolean,
+): Promise<void> {
   await Promise.all([
     mkdir(paths.dataRoot, { recursive: true }),
     mkdir(paths.libraryRoot, { recursive: true }),
@@ -121,11 +127,36 @@ export async function registerIpc(window: BrowserWindow, paths: AppPaths): Promi
     win32.join(paths.dataRoot, "category-order.json"),
   );
   registerCategoryTransferIpc({ categoryOrder, paths });
-  registerCategoryCommandIpc(paths);
 
   const mutationMutex = createAsyncMutex();
   const binding = await registerGameDirectoryIpc(window, paths, mutationMutex, groups);
   const { getInstallService } = binding;
+  const categoryDelete = createCategoryDeleteService({
+    groups,
+    libraryRoot: paths.libraryRoot,
+    recycleMany: async (items) => {
+      const install = getInstallService();
+      if (!install.ok && install.error.code !== "GAME_DIRECTORY_REQUIRED") return install;
+      const result = install.ok
+        ? await createLibraryLifecycleService({
+            groups,
+            libraryRoot: paths.libraryRoot,
+            install: install.value,
+            previews,
+            recycle,
+          }).recycleMany(items)
+        : await recycle.recycleMany(items);
+      return result.ok ? { ok: true, value: result.value } : { ok: false, error: result.error };
+    },
+  });
+  registerCategoryCommandIpc({
+    deleteCategory: (request) =>
+      mutationMutex.runExclusive(async () => {
+        const result = await categoryDelete.remove(request);
+        return result.ok ? result : toApiResult(result);
+      }),
+    paths,
+  });
   registerPresetIpc({ getInstallService, mutationMutex, paths });
   registerAppearanceIpc({ binding, mutationMutex, wallpaper, window });
   registerPreviewIpc({ libraryRoot: paths.libraryRoot, mutationMutex, previews, window });
@@ -338,5 +369,6 @@ export async function registerIpc(window: BrowserWindow, paths: AppPaths): Promi
       return install.ok ? toApiResult(await install.value.disableMany(request.items)) : install;
     }),
   );
+  registerUpdateIpc(window, isPackaged);
   registerRecoveryMode(recoveryState);
 }

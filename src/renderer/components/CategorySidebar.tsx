@@ -37,6 +37,7 @@ type CategorySidebarProps = {
     items: readonly WorkspaceItemReference[],
   ) => void;
   readonly onCreateCategory: () => void;
+  readonly onDeleteCategory: (hasContents: boolean) => void;
   readonly onReorder: (
     parentRelativePath: string,
     orderedChildRelativePaths: readonly string[],
@@ -86,6 +87,21 @@ function countCategoryPatches(categories: readonly ChildCategory[]): number {
   );
 }
 
+function categoryHasContents(
+  categories: readonly ChildCategory[],
+  relativePath: string,
+): boolean | null {
+  const targetPath = relativePath.replaceAll("/", "\\").toLocaleLowerCase();
+  for (const category of categories) {
+    if (category.relativePath.replaceAll("/", "\\").toLocaleLowerCase() === targetPath) {
+      return category.patchCount > 0 || category.childCategories.length > 0;
+    }
+    const nested = categoryHasContents(category.childCategories, relativePath);
+    if (nested !== null) return nested;
+  }
+  return null;
+}
+
 export function CategorySidebar({
   categoryPath,
   navigation,
@@ -97,6 +113,7 @@ export function CategorySidebar({
   onMoveCategory,
   onMoveItems,
   onCreateCategory,
+  onDeleteCategory,
   onReorder,
   presetCount = 0,
   snapshot,
@@ -215,31 +232,23 @@ export function CategorySidebar({
     <nav
       className="category-sidebar"
       aria-label="补丁分类"
+      onKeyDown={(event) => {
+        if (event.key !== "Delete" || readOnly || categoryPath === "") return;
+        if (
+          !(event.target instanceof HTMLElement) ||
+          event.target.closest(".category-row") === null
+        ) {
+          return;
+        }
+        event.preventDefault();
+        onDeleteCategory(
+          categoryHasContents(snapshot?.childCategories ?? [], categoryPath) ?? true,
+        );
+      }}
       onPointerCancel={finishOrdering}
       onPointerUp={finishOrdering}
     >
       <div className="sidebar-heading">
-        <div className="sidebar-settings-actions">
-          <button
-            aria-label="设置"
-            className="icon-button compact sidebar-settings-button"
-            onClick={onSettings}
-            title="设置"
-            type="button"
-          >
-            <Settings size={15} />
-          </button>
-          <button
-            aria-label="调整外观"
-            className="sidebar-appearance-button"
-            onClick={onAppearance}
-            title="调整外观"
-            type="button"
-          >
-            <SlidersHorizontal size={14} />
-            <span>调整外观</span>
-          </button>
-        </div>
         <span className="sidebar-commands">
           <button
             aria-label="新建子分类"
@@ -252,6 +261,27 @@ export function CategorySidebar({
             <FolderPlus size={15} />
           </button>
         </span>
+        <div className="sidebar-settings-actions">
+          <button
+            aria-label="调整外观"
+            className="sidebar-appearance-button"
+            onClick={onAppearance}
+            title="调整外观"
+            type="button"
+          >
+            <SlidersHorizontal size={14} />
+            <span>调整外观</span>
+          </button>
+          <button
+            aria-label="设置"
+            className="icon-button compact sidebar-settings-button"
+            onClick={onSettings}
+            title="设置"
+            type="button"
+          >
+            <Settings size={15} />
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-system-nav">

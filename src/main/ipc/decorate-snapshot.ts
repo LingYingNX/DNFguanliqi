@@ -66,7 +66,9 @@ export function decorateSnapshotWithPreviews(
     patches.push({
       ...patch,
       previewUrl:
-        patch.previewRelativePath === null ? null : libraryPreviewUrl(patch.previewRelativePath),
+        patch.previewRelativePath === null
+          ? null
+          : (patch.previewUrl ?? libraryPreviewUrl(patch.previewRelativePath)),
     });
   }
   const groups: GroupItem[] = [];
@@ -87,7 +89,9 @@ export function decorateSnapshotWithPreviews(
     groups.push({
       ...group,
       previewUrl:
-        group.previewRelativePath === null ? null : libraryPreviewUrl(group.previewRelativePath),
+        group.previewRelativePath === null
+          ? null
+          : (group.previewUrl ?? libraryPreviewUrl(group.previewRelativePath)),
     });
   }
   return ok({

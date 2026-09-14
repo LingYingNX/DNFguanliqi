@@ -18,6 +18,7 @@ import type {
 } from "./preset-contracts";
 import type { ActivePreviewDto, SelectItemPreviewRequestSchema } from "./preview-contracts";
 import type { RecoveryStateDto } from "./recovery-contracts";
+import type { UpdateCheckResult, UpdateEvent } from "./update-contracts";
 
 function isSafeRelativePath(value: string): boolean {
   if (/^[a-z]:[\\/]/iu.test(value) || value.startsWith("\\") || value.startsWith("/")) {
@@ -292,6 +293,10 @@ export const IPC_CHANNELS = {
   presetsAddItems: "presets:add-items",
   presetsInstall: "presets:install",
   getRecoveryState: "settings:get-recovery-state",
+  checkUpdate: "update:check",
+  downloadUpdate: "update:download",
+  installUpdate: "update:install",
+  updateEvent: "update:event",
 } as const;
 
 export type DnfApi = {
@@ -395,6 +400,12 @@ export type DnfApi = {
     readonly subscribeState: (listener: (state: WindowState) => void) => () => void;
   };
   readonly getRecoveryState: () => Promise<ApiResult<RecoveryStateDto>>;
+  readonly update: {
+    readonly check: () => Promise<ApiResult<UpdateCheckResult>>;
+    readonly download: () => Promise<ApiResult<null>>;
+    readonly install: () => Promise<ApiResult<null>>;
+    readonly subscribe: (listener: (event: UpdateEvent) => void) => () => void;
+  };
   readonly getPreviewState: () => Promise<
     ApiResult<{ readonly items: readonly ActivePreviewDto[] }>
   >;

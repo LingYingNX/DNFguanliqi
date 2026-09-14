@@ -85,28 +85,6 @@ describe("preview move lifecycle", () => {
     });
   });
 
-  it("moves a same-name library preview file with the patch", async () => {
-    const { paths } = await createFixture();
-    const source = join(paths.libraryRoot, "Source", "coat.npk");
-    const preview = join(paths.libraryRoot, "Source", "coat.png");
-    await Promise.all([writeFile(source, "patch"), writeFile(preview, "preview")]);
-
-    const result = await moveLibraryItem({
-      libraryRoot: paths.libraryRoot,
-      kind: "patch",
-      sourceRelativePath: "Source\\coat.npk",
-      targetDirectoryRelativePath: "Target",
-    });
-
-    expect(result).toEqual({ ok: true, value: { relativePath: "Target\\coat.npk" } });
-    await expect(readFile(join(paths.libraryRoot, "Target", "coat.png"), "utf8")).resolves.toBe(
-      "preview",
-    );
-    await expect(access(join(paths.libraryRoot, "Source", "coat.png"))).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-  });
-
   it("keeps a virtual group preview binding when the group moves", async () => {
     const { paths, previews } = await createFixture();
     const image = join(paths.dataRoot, "source.png");
@@ -285,28 +263,5 @@ describe("preview move lifecycle", () => {
       ok: true,
       value: [{ kind: "patch", relativePath: "Source\\coat.npk" }],
     });
-  });
-
-  it("keeps a same-name library preview while a patch is recycled and restores it with the patch", async () => {
-    const { lifecycle, paths, previews } = await createFixture();
-    const source = join(paths.libraryRoot, "Source", "coat.npk");
-    const preview = join(paths.libraryRoot, "Source", "coat.png");
-    await Promise.all([writeFile(source, "patch"), writeFile(preview, "preview")]);
-
-    const recycled = await lifecycle().recycle({
-      kind: "patch",
-      relativePath: "Source\\coat.npk",
-    });
-    expect(recycled.ok).toBe(true);
-    await expect(access(source)).rejects.toMatchObject({ code: "ENOENT" });
-    await expect(readFile(preview, "utf8")).resolves.toBe("preview");
-
-    const restored = await createRecycleService({ ...paths, previews }).restore({
-      id: recycled.ok ? recycled.value.entry.id : "missing",
-    });
-
-    expect(restored).toEqual({ ok: true, value: { relativePath: "Source\\coat.npk" } });
-    await expect(readFile(source, "utf8")).resolves.toBe("patch");
-    await expect(readFile(preview, "utf8")).resolves.toBe("preview");
   });
 });

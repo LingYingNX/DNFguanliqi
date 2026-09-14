@@ -26,7 +26,7 @@ async function dropFiles(page: Page, filePaths: readonly string[]): Promise<void
   });
 }
 
-test("stores a patch preview beside the patch and a group preview as a managed asset", async () => {
+test("stores patch previews beside NPK files and group previews as managed assets", async () => {
   const projectRoot = resolve(import.meta.dirname, "../..");
   const runtimeRoot = await mkdtemp(join(tmpdir(), "dnf-library-preview-e2e-"));
   const libraryRoot = join(runtimeRoot, "patch-categories");
@@ -72,23 +72,18 @@ test("stores a patch preview beside the patch and a group preview as a managed a
     const page = await application.firstWindow();
     await page.getByRole("main", { name: "补丁工作区" }).waitFor();
     const patch = page.getByRole("button", { name: "A.npk", exact: true });
+    const patchShell = patch.locator("..");
     const group = page.getByRole("button", { name: "Set", exact: true });
     await expect(patch.locator(".item-preview-image")).toHaveCount(0);
 
-    await patch.locator(".item-preview").dblclick();
+    await patch.locator(".item-preview").hover();
+    await patchShell.locator(".item-preview-hover-zone").dblclick();
     await expect
-      .poll(async () => {
-        try {
-          await access(join(libraryRoot, "A.png"));
-          return true;
-        } catch {
-          return false;
-        }
-      })
-      .toBe(true);
+      .poll(() => readFile(join(libraryRoot, "A.png")).catch(() => null))
+      .toEqual(previewBytes);
     await expect(patch.locator(".item-preview-image")).toHaveAttribute(
       "src",
-      "dnf-library://library/A.png",
+      /^dnf-library:\/\/library\/A\.png\?v=\d+$/u,
     );
     await expect
       .poll(() =>
@@ -219,24 +214,29 @@ test("imports, groups, recycles and restores real NPK files", async () => {
   }
 });
 
-test("keeps patch previews when entering a virtual group", async () => {
+test("changes a patch preview from inside a virtual group", async () => {
   test.setTimeout(60_000);
   const projectRoot = resolve(import.meta.dirname, "../..");
   const runtimeRoot = await mkdtemp(join(tmpdir(), "dnf-group-preview-e2e-"));
   const libraryRoot = join(runtimeRoot, "patch-categories");
-  const previewBytes = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-    "base64",
-  );
+  const oldPreviewPath = join(projectRoot, "前端", "screenshots", "preview-desktop.png");
+  const replacementPath = join(projectRoot, "前端", "screenshots", "cover.png");
+  const [oldBytes, replacementBytes] = await Promise.all([
+    readFile(oldPreviewPath),
+    readFile(replacementPath),
+  ]);
   await mkdir(libraryRoot, { recursive: true });
   await Promise.all([
     writeFile(join(libraryRoot, "a.npk"), "a-payload"),
     writeFile(join(libraryRoot, "b.npk"), "b-payload"),
-    writeFile(join(libraryRoot, "a.png"), previewBytes),
+    writeFile(join(libraryRoot, "a.png"), oldBytes),
   ]);
   const application = await electron.launch({ args: [projectRoot], cwd: runtimeRoot });
 
   try {
+    await application.evaluate(({ dialog }, filePath) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [filePath] });
+    }, replacementPath);
     const page = await application.firstWindow();
     await page.getByRole("main", { name: "补丁工作区" }).waitFor();
     const patch = page.getByRole("button", { name: "a.npk", exact: true });
@@ -252,10 +252,30 @@ test("keeps patch previews when entering a virtual group", async () => {
 
     await page.getByRole("button", { name: "自定义", exact: true }).click({ button: "right" });
     await page.getByRole("menuitem", { name: "进入组", exact: true }).click();
-    await expect(page.getByRole("button", { name: "a.npk", exact: true })).toHaveCount(1);
-    await expect(
-      page.getByRole("button", { name: "a.npk", exact: true }).locator(".item-preview-image"),
-    ).toHaveCount(1);
+    await expect(patch.locator(".item-preview-image")).toHaveCount(1);
+    await expect
+      .poll(() =>
+        patch
+          .locator(".item-preview-image")
+          .evaluate((image) => (image instanceof HTMLImageElement ? image.naturalWidth : 0)),
+      )
+      .toBe(1440);
+    const patchShell = patch.locator("..");
+    await patch.locator(".item-preview").hover();
+    await patchShell.locator(".item-preview-hover-zone").dblclick();
+
+    await expect(readFile(join(libraryRoot, "a.png"))).resolves.toEqual(replacementBytes);
+    await expect
+      .poll(() =>
+        patch
+          .locator(".item-preview-image")
+          .evaluate((image) => (image instanceof HTMLImageElement ? image.naturalWidth : 0)),
+      )
+      .toBe(1200);
+    await expect(patch.locator(".item-preview-image")).toHaveAttribute(
+      "src",
+      /^dnf-library:\/\/library\/a\.png\?v=\d+$/u,
+    );
   } finally {
     await application.close();
     await rm(runtimeRoot, { force: true, recursive: true, maxRetries: 5, retryDelay: 100 });
@@ -692,7 +712,7 @@ test("moves a nested category into another category from the tree", async () => 
   }
 });
 
-test("creates categories while destructive category commands remain hidden", async () => {
+test("creates categories and deletes empty categories with Delete", async () => {
   const projectRoot = resolve(import.meta.dirname, "../..");
   const runtimeRoot = await mkdtemp(join(tmpdir(), "dnf-category-commands-e2e-"));
   const application = await electron.launch({ args: [projectRoot], cwd: runtimeRoot });
@@ -716,6 +736,16 @@ test("creates categories while destructive category commands remain hidden", asy
     await page.getByRole("button", { name: "测试分类", exact: true }).click();
     await expect(page.getByRole("button", { name: "重命名分类" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "删除分类" })).toHaveCount(0);
+    await page.keyboard.press("Delete");
+    await expect(page.getByRole("dialog", { name: "删除分类" })).toHaveCount(0);
+    await expect
+      .poll(() =>
+        access(createdPath).then(
+          () => true,
+          () => false,
+        ),
+      )
+      .toBe(false);
   } finally {
     await application.close();
     await rm(runtimeRoot, { force: true, recursive: true, maxRetries: 5, retryDelay: 100 });

@@ -51,6 +51,7 @@ import {
   SelectItemPreviewRequestSchema,
 } from "../shared/preview-contracts";
 import { RecoveryStateDtoSchema } from "../shared/recovery-contracts";
+import { UpdateCheckResultSchema, UpdateEventSchema } from "../shared/update-contracts";
 
 const CountResultSchema = apiResultSchema(
   z.object({ importedCount: z.number().int(), duplicateCount: z.number().int() }),
@@ -81,6 +82,7 @@ const PreviewListResultSchema = apiResultSchema(
   z.object({ items: z.array(ActivePreviewDtoSchema) }),
 );
 const PreviewResultSchema = apiResultSchema(z.object({ previewUrl: z.string().nullable() }));
+const UpdateCheckResultValueSchema = apiResultSchema(UpdateCheckResultSchema);
 const AppearanceResultSchema = apiResultSchema(
   z.object({
     appearance: AppearanceSettingsDtoSchema,
@@ -281,6 +283,19 @@ const api = {
   deleteWallpaper: (request) => {
     WallpaperSlotRequestSchema.parse(request);
     return invoke(IPC_CHANNELS.deleteWallpaper, AppearanceResultSchema, request);
+  },
+  update: {
+    check: () => invoke(IPC_CHANNELS.checkUpdate, UpdateCheckResultValueSchema),
+    download: () => invoke(IPC_CHANNELS.downloadUpdate, WindowActionResultSchema),
+    install: () => invoke(IPC_CHANNELS.installUpdate, WindowActionResultSchema),
+    subscribe: (listener) => {
+      const handleUpdateEvent = (_event: IpcRendererEvent, value: unknown): void => {
+        const parsed = UpdateEventSchema.safeParse(value);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(IPC_CHANNELS.updateEvent, handleUpdateEvent);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.updateEvent, handleUpdateEvent);
+    },
   },
 } satisfies DnfApi;
 

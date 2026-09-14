@@ -12,6 +12,7 @@ export type ContextMenuAction = {
 
 type ContextMenuProps = {
   readonly actions: readonly ContextMenuAction[];
+  readonly className?: string;
   readonly disabled?: boolean;
   readonly onClose: () => void;
   readonly x: number;
@@ -117,6 +118,7 @@ function MenuList({
 
 export function ContextMenu({
   actions,
+  className,
   disabled = false,
   onClose,
   x,
@@ -152,7 +154,7 @@ export function ContextMenu({
   return (
     <div
       ref={menuRef}
-      className="item-context-menu card"
+      className={`item-context-menu card${className === undefined ? "" : ` ${className}`}`}
       onContextMenu={(event) => event.preventDefault()}
       role="menu"
       style={{ left: x, top: y }}

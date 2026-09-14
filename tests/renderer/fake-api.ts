@@ -1,6 +1,7 @@
 import type { AppearanceBundleDto } from "../../src/shared/appearance-contracts";
 import type { DnfApi } from "../../src/shared/ipc-contracts";
 import type { CategorySnapshot } from "../../src/shared/library-dto";
+import type { UpdateEvent } from "../../src/shared/update-contracts";
 
 const appearanceState = {
   appearance: {
@@ -26,6 +27,10 @@ const appearanceState = {
 const PRESET_ID = "0552babf-49b5-4390-96a7-1846a0c1e9f8";
 
 export function createFakeApi(snapshot: CategorySnapshot): DnfApi {
+  const updateListeners = new Set<(event: UpdateEvent) => void>();
+  const emitUpdate = (event: UpdateEvent): void => {
+    for (const listener of updateListeners) listener(event);
+  };
   const explicitGroupMembers = new Map<string, readonly string[]>([
     [PRESET_ID, ["coat.npk", "sword.npk"]],
   ]);
@@ -45,6 +50,32 @@ export function createFakeApi(snapshot: CategorySnapshot): DnfApi {
 
   return {
     appInfo: { name: "DNF 补丁管理器", version: "1.1.0" },
+    update: {
+      check: async () => {
+        emitUpdate({ kind: "checking" });
+        emitUpdate({ kind: "available", version: "9.9.9" });
+        return {
+          ok: true,
+          value: {
+            currentVersion: "1.1.0",
+            latestVersion: "9.9.9",
+            updateAvailable: true,
+          },
+        };
+      },
+      download: async () => {
+        emitUpdate({ kind: "downloading", percent: 100 });
+        emitUpdate({ kind: "downloaded", version: "9.9.9" });
+        return { ok: true, value: null };
+      },
+      install: async () => ({ ok: true, value: null }),
+      subscribe: (listener) => {
+        updateListeners.add(listener);
+        return () => {
+          updateListeners.delete(listener);
+        };
+      },
+    },
     scan: async () => ({ ok: true, value: snapshot }),
     scanGroup: async ({ groupId }) => {
       const group = snapshot.groups.find((candidate) => candidate.id === groupId);

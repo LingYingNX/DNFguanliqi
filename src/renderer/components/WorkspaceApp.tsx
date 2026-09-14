@@ -3,6 +3,7 @@ import type { DnfApi } from "../../shared/ipc-contracts";
 import type { CategorySnapshot, ChildCategory } from "../../shared/library-dto";
 import type { NavigationSelection, ViewMode } from "../workspace/model";
 import { useAppearance } from "../workspace/useAppearance";
+import { useAppUpdate } from "../workspace/useAppUpdate";
 import { useGameDirectory } from "../workspace/useGameDirectory";
 import { useItemSelection } from "../workspace/useItemSelection";
 import { usePresets } from "../workspace/usePresets";
@@ -67,6 +68,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       : { scope: workspaceScope },
   );
   const gameDirectory = useGameDirectory(client);
+  const appUpdate = useAppUpdate(client);
   const selection = useItemSelection(workspace.visibleItems);
   const presets = usePresets(client, {
     refreshWorkspace: workspace.refresh,
@@ -83,6 +85,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
   });
   const [activeDialog, setActiveDialog] = useState<OperationDialog>(null);
   const [categoryDialog, setCategoryDialog] = useState<CategoryDialog>(null);
+  const [categoryDeleteHasContents, setCategoryDeleteHasContents] = useState(false);
   const [presetDialog, setPresetDialog] = useState<PresetDialog>(null);
   const [operationBusy, setOperationBusy] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -129,7 +132,6 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       />
     ) : (
       <ItemWorkspace
-        cardSize="medium"
         categoryPath={workspace.categoryPath}
         enabledCounts={workspace.enabledCounts}
         enabledFilter={workspace.enabledFilter}
@@ -240,6 +242,14 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
           categoryPath={workspace.categoryPath}
           navigation={navigation}
           onCreateCategory={() => setCategoryDialog("create")}
+          onDeleteCategory={(hasContents) => {
+            setCategoryDeleteHasContents(hasContents);
+            if (hasContents) {
+              setCategoryDialog("delete");
+            } else {
+              void workspace.deleteCategory();
+            }
+          }}
           onAppearance={() => setAppearanceOpen(true)}
           onRecycleBin={() => {
             void workspace.refreshRecycle();
@@ -275,6 +285,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
         categoryPath={workspace.categoryPath}
         createCategory={workspace.createCategory}
         deleteCategory={workspace.deleteCategory}
+        hasContents={categoryDeleteHasContents}
         onClose={() => setCategoryDialog(null)}
         renameCategory={workspace.renameCategory}
       />
@@ -289,6 +300,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       />
       {settingsOpen ? (
         <SettingsDialog
+          currentVersion={client?.appInfo.version ?? "1.2.2"}
           gameDirectory={gameDirectory.gameDirectory}
           gameDirectoryBusy={
             gameDirectory.loading || gameDirectory.selecting || gameDirectory.saving
@@ -303,6 +315,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
           }}
           onSelectGameDirectory={gameDirectory.select}
           onSetGameDirectory={gameDirectory.save}
+          update={appUpdate}
         />
       ) : null}
       {appearanceOpen ? (

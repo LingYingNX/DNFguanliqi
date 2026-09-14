@@ -1,6 +1,8 @@
 import { ipcMain } from "electron";
+import type { z } from "zod";
 import { createCategoryCommands } from "../../core/library/category-commands";
 import {
+  type ApiResult,
   CreateCategoryRequestSchema,
   DeleteCategoryRequestSchema,
   IPC_CHANNELS,
@@ -10,7 +12,17 @@ import type { AppPaths } from "../app-paths";
 import { toApiResult } from "./api-result";
 import { createValidatedHandler } from "./validated-handler";
 
-export function registerCategoryCommandIpc(paths: AppPaths): void {
+type CategoryCommandIpcOptions = {
+  readonly deleteCategory?: (
+    request: z.infer<typeof DeleteCategoryRequestSchema>,
+  ) => Promise<ApiResult<{ readonly relativePath: string }>>;
+  readonly paths: AppPaths;
+};
+
+export function registerCategoryCommandIpc({
+  deleteCategory,
+  paths,
+}: CategoryCommandIpcOptions): void {
   const commands = createCategoryCommands(paths.libraryRoot);
 
   ipcMain.removeHandler(IPC_CHANNELS.createCategory);
@@ -26,8 +38,9 @@ export function registerCategoryCommandIpc(paths: AppPaths): void {
   ipcMain.handle(IPC_CHANNELS.renameCategory, (_event, input: unknown) => rename(input));
 
   ipcMain.removeHandler(IPC_CHANNELS.deleteCategory);
-  const remove = createValidatedHandler(DeleteCategoryRequestSchema, async (request) =>
-    toApiResult(await commands.remove({ relativePath: request.relativePath })),
+  const remove = createValidatedHandler(
+    DeleteCategoryRequestSchema,
+    deleteCategory ?? (async (request) => toApiResult(await commands.remove(request))),
   );
   ipcMain.handle(IPC_CHANNELS.deleteCategory, (_event, input: unknown) => remove(input));
 }

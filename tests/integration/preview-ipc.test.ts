@@ -82,7 +82,7 @@ describe("preview selection IPC", () => {
       webContents: { send: vi.fn() },
     } as unknown as BrowserWindow;
 
-    await registerIpc(window, paths);
+    await registerIpc(window, paths, false);
 
     await expect(readFile(join(category, "coat.png"), "utf8")).resolves.toBe("legacy preview");
     await expect(access(join(paths.dataRoot, "previews", assetName))).rejects.toMatchObject({
@@ -121,7 +121,7 @@ describe("preview selection IPC", () => {
       webContents: { send: vi.fn() },
     } as unknown as BrowserWindow;
 
-    await registerIpc(window, paths);
+    await registerIpc(window, paths, false);
     const select = electronMocks.handlers.get(IPC_CHANNELS.selectItemPreview);
     if (select === undefined) throw new Error("select handler was not registered");
 
@@ -219,7 +219,7 @@ describe("preview selection IPC", () => {
       webContents: { send: vi.fn() },
     } as unknown as BrowserWindow;
 
-    await registerIpc(window, paths);
+    await registerIpc(window, paths, false);
     const create = electronMocks.handlers.get(IPC_CHANNELS.createGroup);
     const dissolve = electronMocks.handlers.get(IPC_CHANNELS.dissolveGroup);
     if (create === undefined || dissolve === undefined)

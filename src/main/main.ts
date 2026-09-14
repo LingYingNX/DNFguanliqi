@@ -77,7 +77,7 @@ if (!hasSingleInstanceLock) {
 
     const openWindow = async (): Promise<void> => {
       const nextWindow = createWindow();
-      await registerIpc(nextWindow, paths);
+      await registerIpc(nextWindow, paths, app.isPackaged);
       loadRenderer(nextWindow);
     };
 

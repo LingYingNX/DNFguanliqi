@@ -6,7 +6,7 @@ import { createFakeApi, WORKSPACE_SNAPSHOT } from "./fake-api";
 
 describe("item previews", () => {
   afterEach(cleanup);
-  it("uses a preview-region double click to choose an image", async () => {
+  it("uses a hover-preview double click to choose an image", async () => {
     const api = createFakeApi(WORKSPACE_SNAPSHOT);
     const selectItemPreview = vi.fn(async () => ({
       ok: true as const,
@@ -15,10 +15,10 @@ describe("item previews", () => {
     const scan = vi.fn(api.scan);
     const { container } = render(<App api={{ ...api, scan, selectItemPreview }} />);
     const card = await screen.findByRole("button", { name: "coat.npk" });
-    const preview = card.querySelector(".item-preview");
-    expect(preview).not.toBeNull();
+    const hoverZone = card.parentElement?.querySelector(".item-preview-hover-zone");
+    expect(hoverZone).not.toBeNull();
 
-    fireEvent.doubleClick(preview ?? container);
+    fireEvent.doubleClick(hoverZone ?? container);
 
     await waitFor(() =>
       expect(selectItemPreview).toHaveBeenCalledWith({ kind: "patch", relativePath: "coat.npk" }),

@@ -15,7 +15,7 @@ describe("window title bar", () => {
     }));
     const close = vi.fn(async () => ({ ok: true as const, value: null }));
     const client = {
-      appInfo: { name: "DNF 补丁管理器", version: "1.2.1" },
+      appInfo: { name: "DNF 补丁管理器", version: "1.2.2" },
       windowControls: {
         getState: vi.fn(async () => ({ ok: true as const, value: { isMaximized: false } })),
         minimize,
@@ -28,7 +28,7 @@ describe("window title bar", () => {
     render(<WindowTitleBar client={client as DnfApi} />);
 
     expect(screen.getByTestId("window-titlebar-drag-region")).toBeInTheDocument();
-    expect(screen.getByText("DNF 补丁管理器 1.2.1")).toBeInTheDocument();
+    expect(screen.getByText("DNF 补丁管理器 1.2.2")).toBeInTheDocument();
     expect(screen.getByText("作者：铃音奈绪")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "最小化" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "最大化" })).toBeInTheDocument();

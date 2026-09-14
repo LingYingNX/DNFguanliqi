@@ -1,17 +1,17 @@
 .item-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--item-card-min-width, 212px), 1fr));
   align-items: start;
   gap: 14px;
   padding: 18px 0 var(--space-2);
 }
 
 .item-grid[data-card-size="small"] {
-  grid-template-columns: repeat(auto-fill, minmax(173px, 1fr));
+  --item-card-min-width: 173px;
 }
 
 .item-grid[data-card-size="large"] {
-  grid-template-columns: repeat(auto-fill, minmax(264px, 1fr));
+  --item-card-min-width: 264px;
 }
 
 .item-card {
@@ -95,7 +95,7 @@
 .item-preview-image {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .item-grid .item-preview {
@@ -592,16 +592,22 @@
 }
 
 .item-list .item-card {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) 92px 112px 120px 92px;
-  align-items: center;
-  gap: var(--space-3);
+  display: block;
+  height: var(--item-list-card-height, 54px);
+  min-height: var(--item-list-card-height, 54px);
+  width: 100%;
+  padding: 0 var(--space-3);
+  align-content: center;
 }
 
-.item-list .item-card {
-  min-height: 54px;
+.item-list .item-card-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 92px 112px 120px 92px;
   width: 100%;
-  padding: var(--space-2) var(--space-3);
+  height: 100%;
+  align-items: center;
+  align-content: center;
+  gap: var(--space-3);
 }
 
 .item-list .item-card-shell {
@@ -610,20 +616,19 @@
 
 .item-list .item-preview {
   position: absolute;
+  top: 50%;
   left: var(--space-3);
-  width: 28px;
+  width: var(--item-list-thumb-size, 46px);
+  height: var(--item-list-thumb-size, 46px);
   aspect-ratio: 1;
   border: 0;
   background: transparent;
+  transform: translateY(-50%);
 }
 
 .item-list .item-preview svg {
-  width: 20px;
-  height: 20px;
-}
-
-.item-list .item-card-body {
-  display: contents;
+  width: var(--item-list-thumb-icon-size, 28px);
+  height: var(--item-list-thumb-icon-size, 28px);
 }
 
 .item-list .item-name-cell,
@@ -637,7 +642,22 @@
 
 .item-list .item-name-cell {
   grid-column: 1;
-  padding-left: 40px;
+  align-self: center;
+  padding-left: var(--item-list-name-padding, 58px);
+}
+
+.item-list .item-type,
+.item-list .item-meta,
+.item-list .item-date {
+  align-self: center;
+}
+
+.item-list .item-card-shell > .switch {
+  top: 50%;
+  right: var(--space-3);
+  bottom: auto;
+  transform: translateY(-50%) scale(0.5);
+  transform-origin: center right;
 }
 
 .item-list .item-title-edit {

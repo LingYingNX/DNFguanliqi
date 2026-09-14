@@ -534,6 +534,62 @@
   outline-offset: 2px;
 }
 
+.card-scale-control {
+  display: flex;
+  min-width: 0;
+  min-height: 28px;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0;
+}
+
+.card-scale-control input[type="range"] {
+  width: 64px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--color-primary);
+  cursor: ew-resize;
+}
+
+.enabled-filter-control .card-scale-step {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  padding: 0;
+  min-height: 20px;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.enabled-filter-control .card-scale-step:hover:not(:disabled) {
+  border: 0;
+  color: var(--color-primary-hover);
+  background: transparent;
+}
+
+.enabled-filter-control .card-scale-step:focus-visible {
+  border: 0;
+  color: var(--color-primary-hover);
+  background: transparent;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-focus);
+}
+
+.enabled-filter-control .card-scale-step:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.card-scale-control input[type="range"]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 .descendant-toggle {
   min-height: 28px;
   gap: 7px;

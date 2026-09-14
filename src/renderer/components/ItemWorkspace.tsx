@@ -7,8 +7,10 @@ import {
   Layers,
   List,
   LogIn,
+  Minus,
   PackageOpen,
   Pencil,
+  Plus,
   Search,
   Trash2,
   Ungroup,
@@ -46,7 +48,6 @@ type SelectionBox = {
 };
 
 type ItemWorkspaceProps = {
-  readonly cardSize: CardSize;
   readonly categoryPath: string;
   readonly enabledCounts: EnabledCounts;
   readonly enabledFilter: EnabledFilter;
@@ -150,7 +151,12 @@ type ContextMenuState = {
   readonly y: number;
 };
 
+const CARD_SCALE_MIN = 80;
+const CARD_SCALE_MAX = 140;
+const CARD_SCALE_STEP = 5;
+
 export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
+  const [cardScale, setCardScale] = useState(100);
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [groupDropTargetPath, setGroupDropTargetPath] = useState<string | null>(null);
@@ -161,6 +167,20 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
   } | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const renamePath = renameState === null ? undefined : workspaceItemKey(renameState.item);
+  const cardScaleEnabled = props.viewMode === "grid";
+  const effectiveCardScale = cardScaleEnabled ? cardScale : CARD_SCALE_MAX;
+  const cardSize: CardSize = cardScaleEnabled
+    ? cardScale < 94
+      ? "small"
+      : cardScale > 112
+        ? "large"
+        : "medium"
+    : "large";
+
+  const updateCardScale = (value: number): void => {
+    if (!cardScaleEnabled) return;
+    setCardScale(Math.min(CARD_SCALE_MAX, Math.max(CARD_SCALE_MIN, value)));
+  };
 
   useEffect(() => {
     if (renamePath === undefined) {
@@ -456,6 +476,46 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
         >
           未启用 {props.enabledCounts.disabled}
         </button>
+        <div
+          className="card-scale-control"
+          onWheel={(event) => {
+            if (!cardScaleEnabled) return;
+            event.preventDefault();
+            updateCardScale(cardScale + (event.deltaY < 0 ? CARD_SCALE_STEP : -CARD_SCALE_STEP));
+          }}
+          title={cardScaleEnabled ? "拖动或使用滚轮调整补丁卡片大小" : "列表模式固定使用最大尺寸"}
+        >
+          <button
+            aria-label="减小补丁卡片"
+            className="card-scale-step"
+            disabled={!cardScaleEnabled || cardScale <= CARD_SCALE_MIN}
+            onClick={() => updateCardScale(cardScale - CARD_SCALE_STEP)}
+            title="减小卡片"
+            type="button"
+          >
+            <Minus aria-hidden="true" size={14} />
+          </button>
+          <input
+            aria-label="补丁卡片缩放"
+            disabled={!cardScaleEnabled}
+            max={CARD_SCALE_MAX}
+            min={CARD_SCALE_MIN}
+            onChange={(event) => updateCardScale(Number(event.currentTarget.value))}
+            step={CARD_SCALE_STEP}
+            type="range"
+            value={cardScale}
+          />
+          <button
+            aria-label="增大补丁卡片"
+            className="card-scale-step"
+            disabled={!cardScaleEnabled || cardScale >= CARD_SCALE_MAX}
+            onClick={() => updateCardScale(cardScale + CARD_SCALE_STEP)}
+            title="增大卡片"
+            type="button"
+          >
+            <Plus aria-hidden="true" size={14} />
+          </button>
+        </div>
         {props.onReturnFromGroup === undefined ? null : (
           <button onClick={props.onReturnFromGroup} type="button">
             返回组
@@ -487,7 +547,16 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
         <section
           className={props.viewMode === "grid" ? "item-grid" : "item-list"}
           aria-label="补丁项目"
-          data-card-size={props.cardSize}
+          data-card-size={cardSize}
+          style={
+            {
+              "--item-card-min-width": `${Math.round(212 * (effectiveCardScale / 100))}px`,
+              "--item-list-card-height": `${Math.round(54 * (effectiveCardScale / 100))}px`,
+              "--item-list-thumb-size": `${Math.round(54 * (effectiveCardScale / 100) - 8)}px`,
+              "--item-list-thumb-icon-size": `${Math.round(28 * (effectiveCardScale / 100))}px`,
+              "--item-list-name-padding": `${Math.round(54 * (effectiveCardScale / 100) + 4)}px`,
+            } as React.CSSProperties
+          }
         >
           {props.visibleItems.map((item) => {
             const itemKey = workspaceItemKey(item);
@@ -665,7 +734,15 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
                     <span className="item-drag-preview-count">{props.selectedItems.length}</span>
                   ) : null}
                 </span>
-                <span aria-hidden="true" className="item-preview-hover-zone">
+                <span
+                  aria-hidden="true"
+                  className="item-preview-hover-zone"
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    props.onSelectPreview(item);
+                  }}
+                >
                   <span className="item-preview-hover-dot" />
                   {item.previewUrl === null ? null : (
                     <img alt="" className="item-preview-hover-image" src={item.previewUrl} />

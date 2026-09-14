@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Halo — Architectural dark design system</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/system.css" />
+  <style>
+    /* ===== Page-only layout for the Halo preview ===== */
+
+    body {
+      background:
+        radial-gradient(1200px 700px at 80% -10%, rgba(91, 107, 255, 0.10), transparent 60%),
+        radial-gradient(900px 600px at -10% 30%, rgba(61, 215, 229, 0.06), transparent 60%),
+        var(--color-background);
+      min-height: 100vh;
+    }
+
+    /* Nav */
+    .page-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(10px);
+      background-color: rgba(10, 11, 15, 0.72);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .page-nav .container { height: 64px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-left { display: inline-flex; align-items: center; gap: var(--space-8); }
+    .brand-row { display: inline-flex; align-items: center; gap: 10px; }
+    .brand-mark {
+      width: 24px; height: 24px;
+      border-radius: 7px;
+      position: relative;
+      background: conic-gradient(from 220deg at 50% 50%, var(--color-primary), #1E2029 35%, #1E2029 65%, var(--color-primary));
+      border: 1px solid var(--color-border-strong);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .brand-name { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; color: var(--color-text-primary); }
+    .brand-suffix { color: var(--color-text-muted); font-weight: 500; }
+    .nav-items { display: inline-flex; align-items: center; gap: var(--space-6); }
+    .nav-items a {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      transition: color var(--motion-base) var(--easing-standard);
+    }
+    .nav-items a:hover, .nav-items a[aria-current="page"] { color: var(--color-text-primary); }
+    .nav-right { display: inline-flex; align-items: center; gap: var(--space-3); }
+    .nav-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 28px; padding: 0 10px;
+      border-radius: var(--radius-full);
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-secondary);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+    .kbd {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--color-elevated);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+    }
+
+    /* Hero */
+    .hero {
+      padding: 96px 0 64px;
+      position: relative;
+    }
+    .hero .container { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 4px 12px 4px 4px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      color: var(--color-text-secondary);
+      font-family: var(--font-display);
+      font-size: 0.75rem; font-weight: 500; letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .hero-eyebrow .pill-dot {
+      width: 22px; height: 22px;
+      border-radius: var(--radius-full);
+      background: var(--color-primary);
+      display: inline-flex; align-items: center; justify-content: center;
+      color: white;
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2.75rem, 5.6vw, 4.5rem);
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      line-height: 1.02;
+      color: var(--color-text-primary);
+      margin: 22px 0 20px;
+    }
+    .hero h1 .accent { color: var(--color-primary); }
+    .hero h1 .muted { color: var(--color-text-muted); }
+    .hero-sub {
+      font-family: var(--font-body);
+      font-size: 1.0625rem;
+      color: var(--color-text-secondary);
+      line-height: 1.55;
+      max-width: 52ch;
+      margin: 0 0 28px;
+    }
+    .hero-actions { display: inline-flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+    .hero-meta {
+      margin-top: 36px;
+      display: flex; align-items: center; gap: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--color-border);
+    }
+    .meta-item { display: flex; flex-direction: column; gap: 4px; }
+    .meta-item .num { font-family: var(--font-mono); font-size: 1.25rem; font-weight: 600; color: var(--color-text-primary); letter-spacing: -0.02em; }
+    .meta-item .lbl { font-family: var(--font-display); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
+
+    /* Hero panel (dashboard mock) */
+    .hero-panel {
+      position: relative;
+      background: linear-gradient(180deg, rgba(30,32,41,0.65), rgba(20,21,28,0.85));
+      border: 1px solid var(--color-border);
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
+    }
+    .hero-panel::before {
+      content: "";
+      position: absolute; inset: -1px;
+      border-radius: 21px;
+      background: linear-gradient(180deg, rgba(91,107,255,0.35), transparent 35%);
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask-composite: exclude;
+      -webkit-mask-composite: xor;
+      padding: 1px;
+      pointer-events: none;
+    }
+    .panel-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 8px 14px;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: 14px;
+    }
+    .panel-bar .dots { display: inline-flex; gap: 6px; }
+    .panel-bar .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-elevated); border: 1px solid var(--color-border); }
+    .panel-bar .title { font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-text-muted); }
+    .panel-bar .right { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); }
+
+    .panel-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .mini-tile {
+      position: relative;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 14px;
+      overflow: hidden;
+    }
+    .mini-tile::before {
+      content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+      background: var(--color-primary);
+    }
+    .mini-tile[data-tone="success"]::before { background: var(--color-success); }
+    .mini-tile[data-tone="warning"]::before { background: var(--color-warning); }
+    .mini-tile[data-tone="info"]::before { background: var(--color-info); }
+    .mini-tile .head { display: flex; align-items: center; justify-content: space-between; }
+    .mini-tile .eyb { font-family: var(--font-display); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-muted); }
+    .mini-tile .val { font-family: var(--font-mono); font-weight: 600; font-size: 1.625rem; letter-spacing: -0.02em; color: var(--color-text-primary); margin-top: 6px; }
+    .mini-tile .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+    .mini-tile .delta { font-family: var(--font-mono); font-size: 0.6875rem; padding: 2px 6px; border-radius: 999px; }
+    .delta-up { color: var(--color-success); background: var(--color-success-soft); }
+    .delta-down { color: var(--color-danger); background: var(--color-danger-soft); }
+    .spark { height: 22px; width: 70px; color: inherit; }
+
+    .panel-chart {
+      margin-top: 12px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 14px;
+      height: 188px;
+      position: relative;
+      overflow: hidden;
+    }
+    .chart-grid {
+      position: absolute; inset: 14px 14px 30px;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 56px 32px;
+    }
+    .chart-svg {
+      position: absolute;
+      inset: 14px 14px 30px;
+      width: calc(100% - 28px); height: calc(100% - 44px);
+      overflow: visible;
+    }
+    .chart-head { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 2; }
+    .chart-legend { display: inline-flex; gap: 12px; align-items: center; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--color-text-muted); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* Sections */
+    .section { padding: 64px 0; }
+    .section-head { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-bottom: 40px; max-width: 720px; }
+    .section-head .eyebrow { font-family: var(--font-display); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-secondary); display: inline-flex; align-items: center; gap: 8px; }
+    .section-head .eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-soft); }
+    .section-head h2 { font-family: var(--font-display); font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.08; font-weight: 600; color: var(--color-text-primary); margin: 0; }
+    .section-head p { font-family: var(--font-body); font-size: 1rem; color: var(--color-text-secondary); margin: 0; max-width: 60ch; line-height: 1.55; }
+
+    /* Tokens section */
+    .tokens-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; }
+    .panel {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+    .panel-title-row { display: flex; align-items: center; justify-content: space-between; }
+    .panel-title { font-family: var(--font-display); font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; color: var(--color-text-primary); margin: 0; }
+    .panel-sub { font-family: var(--font-display); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
+
+    .palette-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+    .swatch-card {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .swatch-tile {
+      aspect-ratio: 1.05/1;
+      border-radius: 12px;
+      border: 1px solid var(--color-border);
+      position: relative;
+      overflow: hidden;
+    }
+    .swatch-tile.is-dark::after {
+      content: ""; position: absolute; inset: 0;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .swatch-name { font-family: var(--font-display); font-size: 0.75rem; color: var(--color-text-primary); font-weight: 500; }
+    .swatch-hex { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--color-text-muted); }
+
+    .type-specimen { display: flex; flex-direction: column; gap: 18px; }
+    .type-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 1px dashed var(--color-border); }
+    .type-row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .type-row .sample-display { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.03em; font-size: 2.75rem; color: var(--color-text-primary); line-height: 1; }
+    .type-row .sample-headline { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.02em; font-size: 1.5rem; color: var(--color-text-primary); line-height: 1.2; }
+    .type-row .sample-body { font-family: var(--font-body); font-weight: 400; letter-spacing: -0.005em; font-size: 0.9375rem; color: var(--color-text-secondary); line-height: 1.5; max-width: 32ch; }
+    .type-row .sample-mono { font-family: var(--font-mono); font-weight: 500; font-size: 0.875rem; color: var(--color-text-primary); }
+    .type-row .meta { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--color-text-muted); text-align: right; min-width: 110px; }
+
+    /* Product / dashboard section */
+    .product-shell {
+      display: grid; grid-template-columns: 240px 1fr; gap: 0;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 20px;
+      overflow: hidden;
+      min-height: 540px;
+    }
+    .side-nav {
+      background: rgba(10, 11, 15, 0.55);
+      border-right: 1px solid var(--color-border);
+      padding: 20px 16px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .side-brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; color: var(--color-text-primary); padding: 0 8px 12px; border-bottom: 1px solid var(--color-border); }
+    .side-section { display: flex; flex-direction: column; gap: 4px; }
+    .side-section .grp { font-family: var(--font-display); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-muted); padding: 8px 8px 4px; }
+    .side-link {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-family: var(--font-display); font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      transition: background var(--motion-base) var(--easing-standard), color var(--motion-base) var(--easing-standard);
+    }
+    .side-link i, .side-link svg { width: 16px; height: 16px; color: var(--color-text-muted); }
+    .side-link:hover { background: var(--color-elevated); color: var(--color-text-primary); }
+    .side-link.is-active { background: var(--color-elevated); color: var(--color-text-primary); border: 1px solid var(--color-border-strong); }
+    .side-link.is-active svg, .side-link.is-active i { color: var(--color-primary); }
+    .side-foot { margin-top: auto; padding: 12px; background: var(--color-elevated); border: 1px solid var(--color-border-strong); border-radius: 12px; display: flex; align-items: center; gap: 10px; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: conic-gradient(from 200deg, var(--color-primary), var(--color-info), var(--color-primary)); border: 1px solid var(--color-border-strong); }
+    .who { display: flex; flex-direction: column; min-width: 0; }
+    .who .nm { font-family: var(--font-display); font-size: 0.8125rem; color: var(--color-text-primary); font-weight: 500; }
+    .who .em { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--color-text-muted); }
+
+    .main-area { padding: 24px 28px 28px; display: flex; flex-direction: column; gap: 20px; }
+    .main-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .crumb { font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-text-muted); display: inline-flex; align-items: center; gap: 8px; }
+    .crumb b { color: var(--color-text-primary); font-weight: 500; }
+    .main-actions { display: inline-flex; align-items: center; gap: 10px; }
+
+    .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+    .work-row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+    .work-panel {
+      background: rgba(10,11,15,0.4);
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .work-panel h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; color: var(--color-text-primary); margin: 0; }
+    .work-panel .panel-top { display: flex; align-items: center; justify-content: space-between; }
+    .chart-wrap { height: 200px; position: relative; }
+    .chart-wrap svg { width: 100%; height: 100%; overflow: visible; }
+    .axis-label { font-family: var(--font-mono); font-size: 0.625rem; fill: var(--color-text-muted); }
+
+    .task-list { display: flex; flex-direction: column; gap: 8px; }
+    .task-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+    }
+    .task-item .task-name { font-family: var(--font-display); font-size: 0.875rem; color: var(--color-text-primary); flex: 1; min-width: 0; }
+    .task-item .task-meta { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--color-text-muted); }
+    .task-item input[type="checkbox"] { margin: 0; }
+    .task-item.is-done .task-name { color: var(--color-text-muted); text-decoration: line-through; }
+
+    /* Components section */
+    .comp-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+    .comp { grid-column: span 6; }
+    .comp.full { grid-column: span 12; }
+    .comp.four { grid-column: span 4; }
+    .comp.eight { grid-column: span 8; }
+    .comp-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex; flex-direction: column; gap: 18px;
+      min-height: 100%;
+    }
+    .comp-head { display: flex; align-items: center; justify-content: space-between; }
+    .comp-title { font-family: var(--font-display); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-muted); }
+    .comp-name { font-family: var(--font-display); font-weight: 600; color: var(--color-text-primary); font-size: 1rem; }
+    .comp-body { display: flex; flex-direction: column; gap: 14px; }
+    .row-wrap { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .check-stack { display: flex; flex-direction: column; gap: 10px; }
+
+    /* CTA */
+    .cta-band {
+      margin: 24px 0 80px;
+      background:
+        radial-gradient(800px 320px at 20% 0%, rgba(91, 107, 255, 0.20), transparent 60%),
+        radial-gradient(700px 320px at 90% 100%, rgba(61, 215, 229, 0.10), transparent 60%),
+        linear-gradient(180deg, rgba(30,32,41,0.6), rgba(20,21,28,0.9));
+      border: 1px solid var(--color-border-strong);
+      border-radius: 24px;
+      padding: 56px 48px;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 32px;
+      align-items: center;
+    }
+    .cta-band h2 { font-family: var(--font-display); font-size: clamp(1.75rem, 3.4vw, 2.5rem); font-weight: 600; letter-spacing: -0.025em; line-height: 1.08; color: var(--color-text-primary); margin: 0 0 12px; }
+    .cta-band p { font-family: var(--font-body); color: var(--color-text-secondary); font-size: 1rem; margin: 0 0 24px; max-width: 50ch; line-height: 1.55; }
+    .cta-form {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-strong);
+      border-radius: 14px;
+      padding: 8px;
+    }
+    .cta-form .input { border: 0; background: transparent; height: 40px; padding-left: 12px; }
+    .cta-form .input:focus { box-shadow: none; }
+
+    /* Footer */
+    .foot {
+      border-top: 1px solid var(--color-border);
+      padding: 32px 0 48px;
+    }
+    .foot .container { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .foot-left { display: inline-flex; align-items: center; gap: 12px; }
+    .foot-version { font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-text-muted); padding: 4px 8px; border-radius: 999px; border: 1px solid var(--color-border); background: var(--color-surface); }
+    .foot-links { display: inline-flex; gap: 22px; }
+    .foot-links a { font-family: var(--font-display); font-size: 0.8125rem; color: var(--color-text-secondary); text-decoration: none; }
+    .foot-links a:hover { color: var(--color-text-primary); }
+    .foot-copy { font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-text-muted); }
+
+    /* Resp */
+    @media (max-width: 980px) {
+      .hero .container { grid-template-columns: 1fr; }
+      .tokens-grid { grid-template-columns: 1fr; }
+      .product-shell { grid-template-columns: 1fr; }
+      .side-nav { display: none; }
+      .work-row { grid-template-columns: 1fr; }
+      .stat-strip { grid-template-columns: repeat(2, 1fr); }
+      .palette-grid { grid-template-columns: repeat(3, 1fr); }
+      .comp, .comp.four, .comp.eight { grid-column: span 12; }
+      .cta-band { grid-template-columns: 1fr; padding: 36px 24px; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="page-nav">
+    <div class="container">
+      <div class="nav-left">
+        <a href="#" class="brand-row" aria-label="Halo home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-name">Halo<span class="brand-suffix"> / design system</span></span>
+        </a>
+        <nav class="nav-items" aria-label="Primary">
+          <a href="#system" aria-current="page">System</a>
+          <a href="#components">Components</a>
+          <a href="#tokens">Tokens</a>
+          <a href="#patterns">Patterns</a>
+          <a href="#changelog">Changelog</a>
+        </nav>
+      </div>
+      <div class="nav-right">
+        <span class="nav-pill">
+          <i data-lucide="search" style="width:14px;height:14px"></i>
+          Search docs
+          <span class="kbd">⌘ K</span>
+        </span>
+        <button class="btn btn-tertiary btn-sm">
+          <i data-lucide="github" style="width:14px;height:14px"></i>
+          GitHub
+        </button>
+        <button class="btn btn-primary btn-sm">
+          Get started
+          <i data-lucide="arrow-right" style="width:14px;height:14px"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero" id="system">
+      <div class="container">
+        <div class="hero-text">
+          <span class="hero-eyebrow">
+            <span class="pill-dot"><i data-lucide="sparkles" style="width:12px;height:12px"></i></span>
+            v1.0 · architectural dark
+          </span>
+          <h1>
+            Interfaces fade.<br />
+            <span class="accent">Information</span> becomes the light.
+          </h1>
+          <p class="hero-sub">
+            Halo is a modern, minimal, and scalable dark design system built around three quiet charcoal tiers, hairline geometry, and a tight palette of saturated signal colors. One opinionated language across button, input, card, checkbox, tabs, and a signature stat tile.
+          </p>
+          <div class="hero-actions">
+            <button class="btn btn-primary btn-lg">
+              <i data-lucide="rocket"></i>
+              Explore the system
+            </button>
+            <button class="btn btn-secondary btn-lg">
+              <i data-lucide="code-2"></i>
+              View on GitHub
+            </button>
+            <button class="btn btn-tertiary btn-lg">
+              Read the docs
+              <i data-lucide="arrow-up-right"></i>
+            </button>
+          </div>
+          <div class="hero-meta">
+            <div class="meta-item">
+              <span class="num">42</span>
+              <span class="lbl">Tokens</span>
+            </div>
+            <div class="meta-item">
+              <span class="num">28</span>
+              <span class="lbl">Components</span>
+            </div>
+            <div class="meta-item">
+              <span class="num">3</span>
+              <span class="lbl">Surface tiers</span>
+            </div>
+            <div class="meta-item">
+              <span class="num">1.5px</span>
+              <span class="lbl">Hairline grid</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero panel: a believable mini-dashboard preview -->
+        <aside class="hero-panel" aria-label="Halo dashboard preview">
+          <div class="panel-bar">
+            <div class="dots" aria-hidden="true">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </div>
+            <span class="title">halo.app / overview</span>
+            <span class="right">
+              <i data-lucide="bell" style="width:14px;height:14px"></i>
+              <i data-lucide="settings" style="width:14px;height:14px"></i>
+            </span>
+          </div>
+
+          <div class="panel-row">
+            <div class="mini-tile" data-tone="info">
+              <div class="head">
+                <span class="eyb">Live users</span>
+                <i data-lucide="users" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+              </div>
+              <div class="val">12,408</div>
+              <div class="foot">
+                <span class="delta delta-up">↑ 8.2%</span>
+                <svg class="spark" viewBox="0 0 70 22" fill="none" stroke="var(--color-info)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="0,16 10,14 18,15 26,11 34,12 42,8 50,9 58,5 66,7" />
+                </svg>
+              </div>
+            </div>
+            <div class="mini-tile" data-tone="success">
+              <div class="head">
+                <span class="eyb">Conversion</span>
+                <i data-lucide="zap" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+              </div>
+              <div class="val">3.81%</div>
+              <div class="foot">
+                <span class="delta delta-up">↑ 0.42</span>
+                <svg class="spark" viewBox="0 0 70 22" fill="none" stroke="var(--color-success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="0,14 10,15 18,12 26,13 34,9 42,11 50,7 58,8 66,4" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-chart" aria-hidden="true">
+            <div class="chart-head">
+              <span class="panel-sub">Revenue · last 30 days</span>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:var(--color-primary)"></span>Net</span>
+                <span class="legend-item"><span class="legend-dot" style="background:var(--color-info)"></span>Refunds</span>
+              </div>
+            </div>
+            <div class="chart-grid"></div>
+            <svg class="chart-svg" viewBox="0 0 520 140" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="g-primary" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#5B6BFF" stop-opacity="0.45" />
+                  <stop offset="100%" stop-color="#5B6BFF" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <path d="M0,100 L40,92 L80,108 L120,80 L160,70 L200,82 L240,55 L280,60 L320,40 L360,52 L400,30 L440,42 L480,22 L520,28 L520,140 L0,140 Z" fill="url(#g-primary)" />
+              <polyline points="0,100 40,92 80,108 120,80 160,70 200,82 240,55 280,60 320,40 360,52 400,30 440,42 480,22 520,28" fill="none" stroke="#5B6BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <polyline points="0,118 40,116 80,120 120,114 160,116 200,112 240,114 280,108 320,112 360,106 400,108 440,104 480,108 520,102" fill="none" stroke="#3DD7E5" stroke-width="1.4" stroke-dasharray="3 3" stroke-linecap="round" />
+            </svg>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- TOKENS / PALETTE / TYPE -->
+    <section class="section" id="tokens">
+      <div class="container">
+        <header class="section-head">
+          <span class="eyebrow">Foundations</span>
+          <h2>A quiet substrate, sharpened by signal</h2>
+          <p>Three surface tiers stack beneath hairline borders while a single electric indigo carries action. Four secondary signal colors — lime, amber, cyan, magenta — each map to one predictable meaning.</p>
+        </header>
+
+        <div class="tokens-grid">
+          <article class="panel">
+            <div class="panel-title-row">
+              <h3 class="panel-title">Palette</h3>
+              <span class="panel-sub">10 core tokens</span>
+            </div>
+            <div class="palette-grid">
+              <div class="swatch-card">
+                <div class="swatch-tile is-dark" style="background:#0A0B0F"></div>
+                <span class="swatch-name">Canvas</span>
+                <span class="swatch-hex">#0A0B0F</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile is-dark" style="background:#14151C"></div>
+                <span class="swatch-name">Surface</span>
+                <span class="swatch-hex">#14151C</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile is-dark" style="background:#1E2029"></div>
+                <span class="swatch-name">Elevated</span>
+                <span class="swatch-hex">#1E2029</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile" style="background:#5B6BFF"></div>
+                <span class="swatch-name">Indigo</span>
+                <span class="swatch-hex">#5B6BFF</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile" style="background:#2BE08C"></div>
+                <span class="swatch-name">Lime</span>
+                <span class="swatch-hex">#2BE08C</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile" style="background:#F5D547"></div>
+                <span class="swatch-name">Amber</span>
+                <span class="swatch-hex">#F5D547</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile" style="background:#3DD7E5"></div>
+                <span class="swatch-name">Cyan</span>
+                <span class="swatch-hex">#3DD7E5</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile" style="background:#FF3A5C"></div>
+                <span class="swatch-name">Magenta</span>
+                <span class="swatch-hex">#FF3A5C</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile is-dark" style="background:#2A2D38"></div>
+                <span class="swatch-name">Border</span>
+                <span class="swatch-hex">#2A2D38</span>
+              </div>
+              <div class="swatch-card">
+                <div class="swatch-tile" style="background:#F2F4F8"></div>
+                <span class="swatch-name">On surface</span>
+                <span class="swatch-hex">#F2F4F8</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title-row">
+              <h3 class="panel-title">Typography</h3>
+              <span class="panel-sub">Inter · JetBrains Mono</span>
+            </div>
+            <div class="type-specimen">
+              <div class="type-row">
+                <div class="sample-display">Halo</div>
+                <span class="meta">Display 72 / 600</span>
+              </div>
+              <div class="type-row">
+                <div class="sample-headline">Architectural dark, signal-led.</div>
+                <span class="meta">Headline 24 / 600</span>
+              </div>
+              <div class="type-row">
+                <div class="sample-body">Quiet substrate, hairline borders, and a single indigo for every action.</div>
+                <span class="meta">Body 15 / 400</span>
+              </div>
+              <div class="type-row">
+                <div class="sample-mono">--color-primary: #5B6BFF;</div>
+                <span class="meta">Mono 14 / 500</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRODUCT / DASHBOARD -->
+    <section class="section" id="patterns">
+      <div class="container">
+        <header class="section-head">
+          <span class="eyebrow">In context</span>
+          <h2>One opinionated grammar, end to end</h2>
+          <p>The same surface tiers, the same hairline borders, the same indigo action — applied to a working console pattern.</p>
+        </header>
+
+        <div class="product-shell">
+          <aside class="side-nav" aria-label="Console navigation">
+            <div class="side-brand">
+              <span class="brand-mark" style="width:22px;height:22px;border-radius:6px"></span>
+              Halo Console
+            </div>
+            <div class="side-section">
+              <span class="grp">Workspace</span>
+              <a class="side-link is-active" href="#"><i data-lucide="layout-dashboard"></i> Overview</a>
+              <a class="side-link" href="#"><i data-lucide="bar-chart-3"></i> Analytics</a>
+              <a class="side-link" href="#"><i data-lucide="layers"></i> Projects</a>
+              <a class="side-link" href="#"><i data-lucide="users"></i> Members</a>
+            </div>
+            <div class="side-section">
+              <span class="grp">Build</span>
+              <a class="side-link" href="#"><i data-lucide="terminal"></i> API keys</a>
+              <a class="side-link" href="#"><i data-lucide="git-branch"></i> Deployments</a>
+              <a class="side-link" href="#"><i data-lucide="bell"></i> Alerts</a>
+            </div>
+            <div class="side-foot">
+              <span class="avatar" aria-hidden="true"></span>
+              <div class="who">
+                <span class="nm">Mira Okafor</span>
+                <span class="em">mira@halo.app</span>
+              </div>
+            </div>
+          </aside>
+
+          <div class="main-area">
+            <div class="main-head">
+              <div class="crumb">
+                <span>Workspace</span>
+                <span aria-hidden="true">/</span>
+                <b>Overview</b>
+              </div>
+              <div class="main-actions">
+                <div class="tabs" role="tablist" aria-label="Range">
+                  <button class="tab is-active" aria-selected="true">24h</button>
+                  <button class="tab" aria-selected="false">7d</button>
+                  <button class="tab" aria-selected="false">30d</button>
+                  <button class="tab" aria-selected="false">90d</button>
+                </div>
+                <button class="btn btn-secondary btn-sm"><i data-lucide="download"></i>Export</button>
+                <button class="btn btn-primary btn-sm"><i data-lucide="plus"></i>New report</button>
+              </div>
+            </div>
+
+            <div class="stat-strip">
+              <article class="stat-tile" data-tone="info">
+                <div class="stat-head">
+                  <span class="stat-eyebrow">Active sessions</span>
+                  <i data-lucide="activity" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+                </div>
+                <div class="stat-value">24,812</div>
+                <div class="stat-meta">
+                  <span class="chip" data-tone="success"><i data-lucide="arrow-up" style="width:10px;height:10px"></i>+12.4%</span>
+                  <svg class="stat-spark" viewBox="0 0 96 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="0,22 12,20 22,24 32,18 44,20 56,14 66,16 78,8 90,12 96,6" />
+                  </svg>
+                </div>
+              </article>
+
+              <article class="stat-tile" data-tone="success">
+                <div class="stat-head">
+                  <span class="stat-eyebrow">Revenue</span>
+                  <i data-lucide="dollar-sign" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+                </div>
+                <div class="stat-value">$284.6K</div>
+                <div class="stat-meta">
+                  <span class="chip" data-tone="success"><i data-lucide="arrow-up" style="width:10px;height:10px"></i>+8.7%</span>
+                  <svg class="stat-spark" viewBox="0 0 96 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="0,24 12,22 24,18 36,20 48,12 60,14 72,10 84,6 96,8" />
+                  </svg>
+                </div>
+              </article>
+
+              <article class="stat-tile" data-tone="warning">
+                <div class="stat-head">
+                  <span class="stat-eyebrow">Error rate</span>
+                  <i data-lucide="alert-triangle" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+                </div>
+                <div class="stat-value">0.42%</div>
+                <div class="stat-meta">
+                  <span class="chip" data-tone="warning"><i data-lucide="arrow-up" style="width:10px;height:10px"></i>+0.06</span>
+                  <svg class="stat-spark" viewBox="0 0 96 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="0,18 12,20 24,16 36,18 48,22 60,18 72,24 84,20 96,26" />
+                  </svg>
+                </div>
+              </article>
+
+              <article class="stat-tile" data-tone="danger">
+                <div class="stat-head">
+                  <span class="stat-eyebrow">Churn</span>
+                  <i data-lucide="user-minus" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+                </div>
+                <div class="stat-value">1.8%</div>
+                <div class="stat-meta">
+                  <span class="chip" data-tone="danger"><i data-lucide="arrow-down" style="width:10px;height:10px"></i>-0.3</span>
+                  <svg class="stat-spark" viewBox="0 0 96 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="0,12 12,16 24,14 36,18 48,16 60,20 72,18 84,22 96,24" />
+                  </svg>
+                </div>
+              </article>
+            </div>
+
+            <div class="work-row">
+              <div class="work-panel">
+                <div class="panel-top">
+                  <h3>Sessions by region</h3>
+                  <div class="tabs" role="tablist" aria-label="Region view">
+                    <button class="tab is-active" aria-selected="true">Volume</button>
+                    <button class="tab" aria-selected="false">Latency</button>
+                  </div>
+                </div>
+                <div class="chart-wrap">
+                  <svg viewBox="0 0 560 200" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="bar-grad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#5B6BFF" stop-opacity="0.95" />
+                        <stop offset="100%" stop-color="#5B6BFF" stop-opacity="0.55" />
+                      </linearGradient>
+                      <linearGradient id="bar-grad-2" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#3DD7E5" stop-opacity="0.85" />
+                        <stop offset="100%" stop-color="#3DD7E5" stop-opacity="0.45" />
+                      </linearGradient>
+                    </defs>
+                    <g stroke="rgba(255,255,255,0.04)">
+                      <line x1="0" y1="40" x2="560" y2="40"/>
+                      <line x1="0" y1="80" x2="560" y2="80"/>
+                      <line x1="0" y1="120" x2="560" y2="120"/>
+                      <line x1="0" y1="160" x2="560" y2="160"/>
+                    </g>
+                    <!-- Bar groups -->
+                    <g>
+                      <rect x="20"  y="80"  width="22" height="100" rx="4" fill="url(#bar-grad)"/>
+                      <rect x="46"  y="100" width="22" height="80"  rx="4" fill="url(#bar-grad-2)"/>
+
+                      <rect x="100" y="60"  width="22" height="120" rx="4" fill="url(#bar-grad)"/>
+                      <rect x="126" y="90"  width="22" height="90"  rx="4" fill="url(#bar-grad-2)"/>
+
+                      <rect x="180" y="40"  width="22" height="140" rx="4" fill="url(#bar-grad)"/>
+                      <rect x="206" y="76"  width="22" height="104" rx="4" fill="url(#bar-grad-2)"/>
+
+                      <rect x="260" y="70"  width="22" height="110" rx="4" fill="url(#bar-grad)"/>
+                      <rect x="286" y="110" width="22" height="70"  rx="4" fill="url(#bar-grad-2)"/>
+
+                      <rect x="340" y="50"  width="22" height="130" rx="4" fill="url(#bar-grad)"/>
+                      <rect x="366" y="86"  width="22" height="94"  rx="4" fill="url(#bar-grad-2)"/>
+
+                      <rect x="420" y="30"  width="22" height="150" rx="4" fill="url(#bar-grad)"/>
+                      <rect x="446" y="70"  width="22" height="110" rx="4" fill="url(#bar-grad-2)"/>
+
+                      <rect x="500" y="60"  width="22" height="120" rx="4" fill="url(#bar-grad)"/>
+                      <rect x="526" y="98"  width="22" height="82"  rx="4" fill="url(#bar-grad-2)"/>
+                    </g>
+                    <g>
+                      <text class="axis-label" x="32"  y="194">Mon</text>
+                      <text class="axis-label" x="112" y="194">Tue</text>
+                      <text class="axis-label" x="192" y="194">Wed</text>
+                      <text class="axis-label" x="272" y="194">Thu</text>
+                      <text class="axis-label" x="352" y="194">Fri</text>
+                      <text class="axis-label" x="432" y="194">Sat</text>
+                      <text class="axis-label" x="512" y="194">Sun</text>
+                    </g>
+                  </svg>
+                </div>
+              </div>
+
+              <div class="work-panel">
+                <div class="panel-top">
+                  <h3>Today's checklist</h3>
+                  <span class="chip" data-tone="info">3 / 5</span>
+                </div>
+                <div class="task-list">
+                  <label class="task-item is-done">
+                    <span class="check"><input type="checkbox" checked /></span>
+                    <span class="task-name">Ship release notes v1.4.2</span>
+                    <span class="task-meta">09:14</span>
+                  </label>
+                  <label class="task-item is-done">
+                    <span class="check"><input type="checkbox" checked /></span>
+                    <span class="task-name">Review dashboard contrast tokens</span>
+                    <span class="task-meta">10:02</span>
+                  </label>
+                  <label class="task-item is-done">
+                    <span class="check"><input type="checkbox" checked /></span>
+                    <span class="task-name">Sync with platform on auth flow</span>
+                    <span class="task-meta">11:30</span>
+                  </label>
+                  <label class="task-item">
+                    <span class="check"><input type="checkbox" /></span>
+                    <span class="task-name">Draft Q3 metrics report</span>
+                    <span class="task-meta">14:00</span>
+                  </label>
+                  <label class="task-item">
+                    <span class="check"><input type="checkbox" /></span>
+                    <span class="task-name">Triage incoming pull requests</span>
+                    <span class="task-meta">16:45</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPONENT SHOWCASE -->
+    <section class="section" id="components">
+      <div class="container">
+        <header class="section-head">
+          <span class="eyebrow">Components</span>
+          <h2>Five reusable surfaces, one language</h2>
+          <p>Every interactive surface in Halo shares the same focus ring, the same 1px border family, and the same 150ms ease.</p>
+        </header>
+
+        <div class="comp-grid">
+
+          <!-- Buttons -->
+          <div class="comp four">
+            <div class="comp-card">
+              <div class="comp-head">
+                <span class="comp-title">Buttons</span>
+                <span class="comp-name">Primary / Secondary / Tertiary</span>
+              </div>
+              <div class="comp-body">
+                <div class="row-wrap">
+                  <button class="btn btn-primary"><i data-lucide="plus"></i>Create</button>
+                  <button class="btn btn-secondary"><i data-lucide="filter"></i>Filter</button>
+                  <button class="btn btn-tertiary">Cancel</button>
+                </div>
+                <div class="row-wrap">
+                  <button class="btn btn-primary btn-sm">Save</button>
+                  <button class="btn btn-secondary btn-sm">Discard</button>
+                  <button class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i>Delete</button>
+                  <button class="btn btn-secondary btn-sm" disabled>Disabled</button>
+                </div>
+                <div class="row-wrap">
+                  <button class="btn btn-primary btn-lg">Continue<i data-lucide="arrow-right"></i></button>
+                  <button class="btn btn-secondary btn-icon btn-lg" aria-label="Settings"><i data-lucide="settings"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inputs -->
+          <div class="comp eight">
+            <div class="comp-card">
+              <div class="comp-head">
+                <span class="comp-title">Form fields</span>
+                <span class="comp-name">Text · Select · Textarea</span>
+              </div>
+              <div class="comp-body">
+                <div class="form-grid">
+                  <div class="field">
+                    <label class="field-label" for="f-email">Work email</label>
+                    <div class="input-group">
+                      <span class="input-icon" aria-hidden="true"><i data-lucide="mail" style="width:16px;height:16px"></i></span>
+                      <input class="input" id="f-email" type="email" value="mira@halo.app" />
+                    </div>
+                    <span class="field-help">We'll never share or sell your address.</span>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="f-team">Team</label>
+                    <select class="select" id="f-team">
+                      <option>Platform</option>
+                      <option>Design Systems</option>
+                      <option>Growth</option>
+                      <option>Operations</option>
+                    </select>
+                    <span class="field-help">Used for routing and notifications.</span>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="f-key">API key</label>
+                    <input class="input" id="f-key" type="text" value="halo_sk_1c8f...e2a9" />
+                    <span class="field-help">Last rotated 4 days ago.</span>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="f-region">Region</label>
+                    <input class="input is-invalid" id="f-region" type="text" value="eu-west-99" />
+                    <span class="field-help is-error">Region "eu-west-99" is not available.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Checkbox + Tabs -->
+          <div class="comp four">
+            <div class="comp-card">
+              <div class="comp-head">
+                <span class="comp-title">Checkbox · Radio · Switch</span>
+                <span class="comp-name">Selection</span>
+              </div>
+              <div class="comp-body">
+                <div class="check-stack">
+                  <label class="check"><input type="checkbox" checked /> Enable telemetry</label>
+                  <label class="check"><input type="checkbox" checked /> Auto-rotate API keys</label>
+                  <label class="check"><input type="checkbox" /> Send weekly digest</label>
+                  <label class="check"><input type="checkbox" disabled /> Beta features (org locked)</label>
+                </div>
+                <hr class="divider" />
+                <div class="check-stack">
+                  <label class="check"><input type="radio" name="r1" checked /> Dark substrate</label>
+                  <label class="check"><input type="radio" name="r1" /> Inverted (high contrast)</label>
+                </div>
+                <hr class="divider" />
+                <label class="switch" aria-label="Notifications">
+                  <input type="checkbox" checked />
+                  <span class="switch-track"></span>
+                  <span class="switch-thumb"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="comp eight">
+            <div class="comp-card">
+              <div class="comp-head">
+                <span class="comp-title">Tabs · Chips · Signal pills</span>
+                <span class="comp-name">State and feedback</span>
+              </div>
+              <div class="comp-body">
+                <div class="row-wrap">
+                  <div class="tabs" role="tablist">
+                    <button class="tab is-active" aria-selected="true"><i data-lucide="line-chart" style="width:14px;height:14px"></i>Overview</button>
+                    <button class="tab"><i data-lucide="users" style="width:14px;height:14px"></i>Members</button>
+                    <button class="tab"><i data-lucide="settings" style="width:14px;height:14px"></i>Settings</button>
+                    <button class="tab"><i data-lucide="bell" style="width:14px;height:14px"></i>Alerts</button>
+                  </div>
+                </div>
+                <div class="row-wrap">
+                  <span class="chip"><i data-lucide="sparkles"></i>Primary</span>
+                  <span class="chip" data-tone="success"><i data-lucide="check"></i>Success</span>
+                  <span class="chip" data-tone="warning"><i data-lucide="alert-triangle"></i>Warning</span>
+                  <span class="chip" data-tone="info"><i data-lucide="info"></i>Info</span>
+                  <span class="chip" data-tone="danger"><i data-lucide="x"></i>Danger</span>
+                  <span class="chip" data-tone="neutral">v1.4.2</span>
+                </div>
+                <div class="row-wrap">
+                  <span class="badge-dot"></span>
+                  <span class="badge-dot" data-tone="success"></span>
+                  <span class="badge-dot" data-tone="warning"></span>
+                  <span class="badge-dot" data-tone="info"></span>
+                  <span class="badge-dot" data-tone="danger"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Signature: Stat tiles -->
+          <div class="comp full">
+            <div class="comp-card">
+              <div class="comp-head">
+                <span class="comp-title">Signature · Stat Tile</span>
+                <span class="comp-name">Metric · trend · sparkline</span>
+              </div>
+              <div class="comp-body" style="gap: 18px;">
+                <div class="grid-4" style="gap: 16px;">
+                  <article class="stat-tile">
+                    <div class="stat-head">
+                      <span class="stat-eyebrow">Total customers</span>
+                      <i data-lucide="users" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+                    </div>
+                    <div class="stat-value">38,204</div>
+                    <div class="stat-meta">
+                      <span class="chip" data-tone="success"><i data-lucide="arrow-up" style="width:10px;height:10px"></i>+5.6%</span>
+                      <svg class="stat-spark" viewBox="0 0 96 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="0,22 12,18 24,20 36,14 48,16 60,10 72,12 84,7 96,4" />
+                      </svg>
+                    </div>
+                  </article>
+
+                  <article class="stat-tile" data-tone="info">
+                    <div class="stat-head">
+                      <span class="stat-eyebrow">API requests</span>
+                      <i data-lucide="terminal" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+                    </div>
+                    <div class="stat-value">12.4M</div>
+                    <div class="stat-meta">
+                      <span class="chip" data-tone="info"><i data-lucide="arrow-up" style="width:10px;height:10px"></i>+14%</span>
+                      <svg class="stat-spark" viewBox="0 0 96 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="0,20 12,22 24,16 36,18 48,12 60,14 72,8 84,12 96,5" />
+                      </svg>
+                    </div>
+                  </article>
+
+                  <article class="stat-tile" data-tone="warning">
+                    <div class="stat-head">
+                      <span class="stat-eyebrow">P95 latency</span>
+                      <i data-lucide="gauge" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+                    </div>
+                    <div class="stat-value">128 ms</div>
+                    <div class="stat-meta">
+                      <span class="chip" data-tone="warning"><i data-lucide="arrow-up" style="width:10px;height:10px"></i>+9 ms</span>
+                      <svg class="stat-spark" viewBox="0 0 96 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="0,18 12,20 24,16 36,22 48,18 60,24 72,20 84,26 96,22" />
+                      </svg>
+                    </div>
+                  </article>
+
+                  <article class="stat-tile" data-tone="danger">
+                    <div class="stat-head">
+                      <span class="stat-eyebrow">Failed jobs</span>
+                      <i data-lucide="x-circle" style="width:14px;height:14px;color:var(--color-text-muted)"></i>
+                    </div>
+                    <div class="stat-value">241</div>
+                    <div class="stat-meta">
+                      <span class="chip" data-tone="danger"><i data-lucide="arrow-down" style="width:10px;height:10px"></i>-12%</span>
+                      <svg class="stat-spark" viewBox="0 0 96 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="0,8 12,12 24,10 36,14 48,12 60,16 72,18 84,22 96,26" />
+                      </svg>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="section" style="padding-top: 0;">
+      <div class="container">
+        <div class="cta-band">
+          <div>
+            <h2>Bring quiet light to your product.</h2>
+            <p>One token language, one icon stroke weight, and a single composable component system — ready for dashboards, consoles, and editorial product surfaces.</p>
+            <div class="row-wrap">
+              <button class="btn btn-primary btn-lg"><i data-lucide="download"></i>Install package</button>
+              <button class="btn btn-secondary btn-lg"><i data-lucide="book-open"></i>Read the docs</button>
+            </div>
+          </div>
+          <form class="cta-form" onsubmit="event.preventDefault();">
+            <input class="input" type="email" placeholder="you@team.com" aria-label="Email" />
+            <button class="btn btn-primary" type="submit">Request access</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="container">
+      <div class="foot-left">
+        <span class="brand-row">
+          <span class="brand-mark" style="width:20px;height:20px;border-radius:5px"></span>
+          <span class="brand-name">Halo</span>
+        </span>
+        <span class="foot-version">v1.0.0 · stable</span>
+      </div>
+      <nav class="foot-links" aria-label="Footer">
+        <a href="#">Docs</a>
+        <a href="#">Components</a>
+        <a href="#">Tokens</a>
+        <a href="#">Changelog</a>
+        <a href="#">License</a>
+      </nav>
+      <span class="foot-copy">© 2026 Halo Systems</span>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    if (window.lucide && lucide.createIcons) lucide.createIcons();
+  </script>
+</body>
+</html>
