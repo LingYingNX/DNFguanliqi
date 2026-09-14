@@ -1,18 +1,19 @@
 import { createRequire } from "node:module";
+import { dirname } from "node:path";
 import { type BrowserWindow, ipcMain } from "electron";
 import { APP_VERSION } from "../../shared/contracts";
 import { type ApiResult, IPC_CHANNELS } from "../../shared/ipc-contracts";
 import type { UpdateCheckResult, UpdateEvent } from "../../shared/update-contracts";
 import { apiError } from "./api-result";
 
-type AutoUpdater = typeof import("electron-updater")["autoUpdater"];
+type AutoUpdater = import("electron-updater").NsisUpdater;
 
 // electron-updater 只有 CommonJS 入口，且实例化时要读 app.getVersion()，
 // 所以必须用 createRequire 且在打包环境里惰性加载。
 const requireCjs = createRequire(import.meta.url);
 
 const loadAutoUpdater = (): AutoUpdater =>
-  (requireCjs("electron-updater") as typeof import("electron-updater")).autoUpdater;
+  (requireCjs("electron-updater") as typeof import("electron-updater")).autoUpdater as AutoUpdater;
 
 const ok = <T>(value: T): ApiResult<T> => ({ ok: true, value });
 
@@ -25,6 +26,8 @@ export function registerUpdateIpc(window: BrowserWindow, isPackaged: boolean): v
   };
 
   if (updater !== undefined) {
+    // NSIS updates must reuse the directory of the running executable.
+    updater.installDirectory = dirname(process.execPath);
     updater.autoDownload = false;
     updater.on("checking-for-update", () => publish({ kind: "checking" }));
     updater.on("update-available", (info) => publish({ kind: "available", version: info.version }));
