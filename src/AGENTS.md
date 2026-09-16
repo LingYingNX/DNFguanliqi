@@ -68,3 +68,28 @@ pnpm build
 
 - 改 `src/shared/contracts.ts` 的 `APP_VERSION` 时，必须同步 `package.json` 版本与 Git 标签。
 - 外观相关 CSS 变量由 `src/renderer/workspace/useAppearance.ts` 统一写入，不要在组件里另起变量名。
+
+## 禁止重复造路径/状态辅助（简化前必读）
+
+路径与状态读取的辅助函数已在 2026-09 收敛为共享实现，**新增或改写这些逻辑前必须先 import 现有函数，不得再写本地副本或内联等价表达式**。
+
+必须复用的函数（写代码前先查这里）：
+
+| 需求 | 唯一实现 | 注意 |
+|------|----------|------|
+| 路径比较键（大小写不敏感） | `shared/path-key.ts` 的 `pathKey` | 只换分隔符，**不**折叠 `..`/`.`/重复分隔符 |
+| 判断子路径 | 同上 `isPathWithin` / `isPathWithinKey` | 不要手写 `startsWith(parent + "\\")` |
+| 拒绝绝对路径与 `..` 穿越 | `shared/relative-path-guard.ts` 的 `isSafeRelativePath` | 契约 schema 组合用，勿各自内联正则 |
+| 扩展名判断 `.npk` | `core/paths/relative-path.ts` 的 `isNpkPath` | 勿写 `win32.extname(x).toLocaleLowerCase() === ".npk"` |
+| 父级相对路径 | 同上 `parentRelativePath` | 顶层项归一化为 `""` |
+| 去掉 `./` 前缀 | 同上 `normalizeRelativePath` | 不转小写，调用方自行决定 |
+| 已存在路径的身份比较 | 同上 `normalizedPathKey`（`win32.normalize` 后转小写） | 会折叠 `..`/`.`，与 `pathKey` **语义不同，不可互换** |
+| 捕获 ENOENT | `core/filesystem/path-exists.ts` 的 `isNotFoundError` | 勿写 `error.code === "ENOENT"` 内联判断 |
+| 状态读取回退默认值 | `core/state/atomic-json-store.ts` 的 `readOrFallback` | 勿重写 `STATE_MISSING` 分支 |
+
+约束：
+
+- **`pathKey` 与 `normalizedPathKey` 不可互换**：前者是纯字符串键（保留 `a//b`、`./a`、`a/../b` 原样），后者走 `win32.normalize` 会折叠。混用会静默改变去重与匹配行为；已有单测锁定该差异（`tests/unit/relative-path.test.ts`）。
+- 允许保留的例外：`group-marker.ts` 与 `group-service.ts` 的 ENOENT 判断用更窄的 `error instanceof Error` 形式，比 `isNotFoundError` 限制更严，合并会放宽输入范围，故有意保留。同理 `AppearanceDialog` 的 `hexToHsv`/`hsvToHex` 与 `CategorySidebar` 的 `hexToHue`/`hueToHex` 存在 ±1 度取整差异，**不得合并**。
+- 新增共享辅助前先在本文件与 `src/shared/`、`src/core/paths/` 搜索；确认不存在才新增，并在本表登记。
+- 修改上表任一函数时，同步跑 `pnpm vitest run tests/unit/path-key.test.ts tests/unit/relative-path.test.ts tests/unit/relative-path-guard.test.ts`。
