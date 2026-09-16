@@ -59,5 +59,5 @@ pnpm test
 ## House Rules (project-specific)
 
 - `harness-verify.yml` 只校验文档 harness，不要往里塞构建逻辑。
-- 新增工作流或改动现有 workflow 后，同步更新本文件的 Overview 与 Key Files：`verify-harness.sh` 的 drift 检查只比对根 `AGENTS.md`，不会提醒 scoped 文件过期。
+- 新增工作流或改动现有 workflow 后，同步更新本文件的 Overview 与 Key Files。`verify-harness.sh --level=3` 的 drift 检查会识别「被改动目录下（或其祖先）的 scoped AGENTS.md」已更新，但它只判断**有没有动文档**，不判断**改得对不对**——所以同步仍需人工完成。
 - 重复辅助守卫（`no-duplicate-helpers.yml`）的规则与例外定义在 `scripts/check-path-helpers.mjs`；调整允许清单时同步更新其回归测试 `tests/unit/check-path-helpers.test.ts` 与 `src/AGENTS.md` 的对照表。

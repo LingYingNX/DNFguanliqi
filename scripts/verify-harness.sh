@@ -516,6 +516,13 @@ check_drift() {
                 changed_dir="${changed_file%/*}"
                 [[ "$changed_dir" == "$changed_file" ]] && changed_dir=""
                 ;;
+            scripts/*)
+                # Harness scripts are documented in AGENTS.md (verification
+                # commands, hook wiring). Skipping them let a script change ship
+                # with the docs still describing the old behaviour.
+                build_files_changed=true
+                changed_dir="scripts"
+                ;;
             AGENTS.md)
                 agents_changed=true
                 ;;
