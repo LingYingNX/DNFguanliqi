@@ -21,6 +21,7 @@
     "release": "pnpm build && electron-builder --win nsis --x64 --publish always",
     "verify:portable": "node scripts/verify-portable.mjs",
     "verify:packaged": "node scripts/verify-packaged.mjs",
+    "verify:no-dup-helpers": "node scripts/check-path-helpers.mjs",
     "doctor": "npx react-doctor@latest"
   },
   "build": {

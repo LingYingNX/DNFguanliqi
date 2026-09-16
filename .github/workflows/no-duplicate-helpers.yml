@@ -1,0 +1,20 @@
+name: Duplicate Helper Guard
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  no-duplicate-helpers:
+    name: Reject duplicate path/state helpers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for duplicate helpers
+        run: node scripts/check-path-helpers.mjs

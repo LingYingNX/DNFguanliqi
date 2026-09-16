@@ -4,3 +4,8 @@ set -eu
 if command -v bash >/dev/null 2>&1 && [ -f scripts/verify-harness.sh ]; then
   bash scripts/verify-harness.sh --level=1 --format=text
 fi
+
+# 阻止重新引入重复的路径/状态辅助实现（规则见 src/AGENTS.md）。
+if command -v node >/dev/null 2>&1 && [ -f scripts/check-path-helpers.mjs ]; then
+  node scripts/check-path-helpers.mjs
+fi
