@@ -43,6 +43,7 @@ pnpm exec install-electron       # 发布/打包前准备 Electron 二进制
 pnpm release                     # 构建并发布 GitHub Release（需要 GH_TOKEN）
 pnpm verify:portable             # 校验 portable 产物
 pnpm verify:packaged             # 校验打包产物
+pnpm verify:no-dup-helpers       # 拒绝重复的路径/状态辅助实现
 pnpm doctor                      # react-doctor 诊断
 ```
 

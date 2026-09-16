@@ -4,7 +4,7 @@
 
 ## Overview
 
-两条流水线：`release.yml`（推送 `v*` 标签时构建并发布 GitHub Release）、`harness-verify.yml`（master 的 push/PR 上校验 AGENTS.md harness 一致性）。
+三条流水线：`release.yml`（推送 `v*` 标签时构建并发布 GitHub Release）、`harness-verify.yml`（master 的 push/PR 上校验 AGENTS.md harness 一致性）、`no-duplicate-helpers.yml`（master 的 push/PR 上拒绝重复的路径/状态辅助实现）。
 
 ## Key Files
 
@@ -12,6 +12,7 @@
 |------|------|
 | `release.yml` | windows-latest 上校验 tag 与版本一致，安装 Electron 二进制后 `pnpm run release` |
 | `harness-verify.yml` | ubuntu-latest 上运行 `bash scripts/verify-harness.sh` |
+| `no-duplicate-helpers.yml` | ubuntu-latest 上运行 `node scripts/check-path-helpers.mjs`，与 `.githooks/pre-commit` 同源 |
 
 ## Workflow files
 
@@ -58,3 +59,5 @@ pnpm test
 ## House Rules (project-specific)
 
 - `harness-verify.yml` 只校验文档 harness，不要往里塞构建逻辑。
+- 新增工作流或改动现有 workflow 后，同步更新本文件的 Overview 与 Key Files：`verify-harness.sh` 的 drift 检查只比对根 `AGENTS.md`，不会提醒 scoped 文件过期。
+- 重复辅助守卫（`no-duplicate-helpers.yml`）的规则与例外定义在 `scripts/check-path-helpers.mjs`；调整允许清单时同步更新其回归测试 `tests/unit/check-path-helpers.test.ts` 与 `src/AGENTS.md` 的对照表。
