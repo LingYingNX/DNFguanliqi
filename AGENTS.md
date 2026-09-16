@@ -57,9 +57,13 @@ pnpm doctor                      # react-doctor 诊断
 | `src/renderer` | React UI（`components/`、`styles/`、`workspace/`） |
 | `src/shared` | 主进程/渲染进程共享类型 |
 | `src/core` | 业务逻辑，按域拆分 |
+| `src/core/application` | 跨域用例编排（分类删除、库生命周期） |
+| `src/core/assets` | 受管图片资源 |
 | `src/core/filesystem` | 文件事务、hash、路径存在性 |
 | `src/core/install` | 安装/启用/禁用/迁移/边界 |
 | `src/core/library` | 扫描、导入、分类、移动、预览 |
+| `src/core/paths` | 库路径解析与相对路径归一化 |
+| `src/core/previews` | 补丁/组预览绑定与状态 |
 | `src/core/recycle` | 回收站清单与恢复 |
 | `src/core/state` | 原子 JSON 存储与 schema |
 | `src/core/groups` | 虚拟分组与迁移 |

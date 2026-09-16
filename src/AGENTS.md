@@ -14,6 +14,9 @@ Electron 主进程、预加载桥、渲染进程 React UI 与共享类型。生�
 | `src/preload/` | `contextBridge` 暴露给渲染进程的 `DnfApi` |
 | `src/renderer/` | React 界面（`components/`、`styles/`、`workspace/`） |
 | `src/core/` | 按业务域拆分的逻辑，不得依赖 renderer 组件 |
+| `src/core/paths/relative-path.ts` | 主进程侧相对路径工具（父路径、`.npk` 判断、`win32.normalize` 身份） |
+| `src/shared/path-key.ts` | 主/渲染进程共用的纯字符串路径键（`pathKey`、`isPathWithin`） |
+| `src/shared/relative-path-guard.ts` | 拒绝绝对路径与 `..` 穿越的校验器，供各契约 schema 组合 |
 | `src/shared/` | 主进程/渲染进程共享契约与 schema |
 
 ## Setup & environment
