@@ -1,5 +1,10 @@
 import { ok, type Result } from "../../shared/result";
-import { createAtomicJsonStore, type StateStoreError } from "../state/atomic-json-store";
+import { normalizeRelativePath } from "../paths/relative-path";
+import {
+  createAtomicJsonStore,
+  readOrFallback,
+  type StateStoreError,
+} from "../state/atomic-json-store";
 import { type CategoryOrderState, CategoryOrderStateSchema } from "../state/schemas";
 
 export type CategoryOrderService = {
@@ -21,10 +26,6 @@ export type CategoryOrderMove = {
   readonly targetParentChildRelativePaths: readonly string[];
 };
 
-function normalizeRelativePath(relativePath: string): string {
-  return relativePath.replaceAll("/", "\\").replace(/^\.\\/u, "");
-}
-
 function relocateRelativePath(
   relativePath: string,
   sourceRelativePath: string,
@@ -44,12 +45,8 @@ function relocateRelativePath(
 export function createCategoryOrderService(file: string): CategoryOrderService {
   const store = createAtomicJsonStore(file, CategoryOrderStateSchema);
 
-  const read = async (): Promise<Result<CategoryOrderState, StateStoreError>> => {
-    const result = await store.read();
-    return result.ok || result.error.code !== "STATE_MISSING"
-      ? result
-      : ok({ formatVersion: 1, orders: {} });
-  };
+  const read = (): Promise<Result<CategoryOrderState, StateStoreError>> =>
+    readOrFallback(store, () => ({ formatVersion: 1, orders: {} }));
 
   return {
     async getAll() {

@@ -1,5 +1,6 @@
 import { win32 } from "node:path";
 import type { DataRoot, LibraryRoot } from "../../main/app-paths";
+import { pathKey } from "../../shared/path-key";
 import { err, ok, type Result } from "../../shared/result";
 import {
   executeFileTransaction,
@@ -51,10 +52,6 @@ export type MoveLibraryItemsPlan = {
   readonly steps: readonly FileTransactionStep[];
 };
 
-function identity(path: string): string {
-  return path.replaceAll("/", "\\").toLocaleLowerCase();
-}
-
 function groupsFor(
   request: MoveLibraryItemsRequest,
   overrides: MoveLibraryItemsOverrides,
@@ -85,7 +82,7 @@ export async function prepareMoveLibraryItems(
 ): Promise<Result<MoveLibraryItemsPlan, MoveLibraryItemsError>> {
   if (request.items.length === 0) return err({ code: "INVALID_MOVE_SELECTION" });
   const distinctSelectionIds = request.items.map((item) =>
-    identity(item.kind === "patch" ? item.sourceRelativePath : item.groupId),
+    pathKey(item.kind === "patch" ? item.sourceRelativePath : item.groupId),
   );
   if (new Set(distinctSelectionIds).size !== distinctSelectionIds.length) {
     return err({ code: "INVALID_MOVE_SELECTION" });
@@ -118,8 +115,8 @@ export async function prepareMoveLibraryItems(
     plannedMoves.push(planned.value);
   }
 
-  const sourcePaths = plannedMoves.flatMap((plan) => plan.fileSourceRelativePaths).map(identity);
-  const targetPaths = plannedMoves.flatMap((plan) => plan.fileTargetRelativePaths).map(identity);
+  const sourcePaths = plannedMoves.flatMap((plan) => plan.fileSourceRelativePaths).map(pathKey);
+  const targetPaths = plannedMoves.flatMap((plan) => plan.fileTargetRelativePaths).map(pathKey);
   if (
     new Set(sourcePaths).size !== sourcePaths.length ||
     new Set(targetPaths).size !== targetPaths.length

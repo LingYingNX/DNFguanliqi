@@ -5,6 +5,7 @@ import { err, ok, type Result } from "../../shared/result";
 import type { FileTransactionStep } from "../filesystem/file-transaction";
 import { hashFile } from "../filesystem/hash-file";
 import { pathExists } from "../filesystem/path-exists";
+import { normalizedPathKey } from "../paths/relative-path";
 import type { InstallationRecord, InstallationState } from "../state/schemas";
 import type { InstallBatchContext, InstallServiceError } from "./install-service";
 import { assertInstallTargetBoundary } from "./install-target-boundary";
@@ -31,10 +32,6 @@ export type RelocateInstallationsPlan = {
   readonly updatedCount: number;
 };
 
-function identity(path: string): string {
-  return win32.normalize(path).toLocaleLowerCase();
-}
-
 function relocatedSourcePath(
   record: InstallationRecord,
   request: RelocateInstallationRequest,
@@ -60,7 +57,7 @@ export async function prepareRelocateInstallations(
 ): Promise<Result<RelocateInstallationsPlan, InstallServiceError>> {
   const seenSources = new Set<string>();
   for (const request of requests) {
-    const sourceIdentity = identity(request.fromRelativePath);
+    const sourceIdentity = normalizedPathKey(request.fromRelativePath);
     if (seenSources.has(sourceIdentity)) {
       return err({ code: "DUPLICATE_ITEM", relativePath: request.fromRelativePath });
     }
@@ -81,7 +78,7 @@ export async function prepareRelocateInstallations(
         request.fromRelativePath,
       );
       for (const record of records) {
-        const recordIdentity = identity(record.sourceRelativePath);
+        const recordIdentity = normalizedPathKey(record.sourceRelativePath);
         if (selectedRecords.has(recordIdentity)) {
           return err({ code: "DUPLICATE_ITEM", relativePath: record.sourceRelativePath });
         }
@@ -94,8 +91,8 @@ export async function prepareRelocateInstallations(
         }
         const nextSourcePath = relocatedSourcePath(record, request);
         const nextTargetPath = win32.join(context.gameRoot, win32.basename(nextSourcePath));
-        const nextSourceIdentity = identity(nextSourcePath);
-        const nextTargetIdentity = identity(nextTargetPath);
+        const nextSourceIdentity = normalizedPathKey(nextSourcePath);
+        const nextTargetIdentity = normalizedPathKey(nextTargetPath);
         if (nextSources.has(nextSourceIdentity) || nextTargets.has(nextTargetIdentity)) {
           return err({ code: "TARGET_CONFLICT", targetPath: nextTargetPath });
         }

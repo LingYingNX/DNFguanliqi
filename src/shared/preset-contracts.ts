@@ -1,11 +1,5 @@
 import { z } from "zod";
-
-function isSafeRelativePath(value: string): boolean {
-  if (/^[a-z]:[\\/]/iu.test(value) || value.startsWith("\\") || value.startsWith("/")) {
-    return false;
-  }
-  return !value.replaceAll("\\", "/").split("/").includes("..");
-}
+import { isSafeRelativePath } from "./relative-path-guard";
 
 export const PresetRelativePathSchema = z.string().min(1).max(1024).refine(isSafeRelativePath);
 

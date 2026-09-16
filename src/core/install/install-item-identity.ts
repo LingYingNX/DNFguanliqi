@@ -1,5 +1,5 @@
-import { win32 } from "node:path";
 import { err, ok, type Result } from "../../shared/result";
+import { normalizedPathKey } from "../paths/relative-path";
 import type { InstallItem, InstallServiceError } from "./install-service";
 
 export function rejectDuplicateItems(
@@ -9,7 +9,7 @@ export function rejectDuplicateItems(
   for (const item of items) {
     const normalized =
       item.kind === "patch"
-        ? `patch:${win32.normalize(item.relativePath).toLocaleLowerCase()}`
+        ? `patch:${normalizedPathKey(item.relativePath)}`
         : `group:${item.groupId.toLocaleLowerCase()}`;
     if (paths.has(normalized)) {
       return err({

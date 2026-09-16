@@ -1,4 +1,5 @@
 import type { GroupItem, PatchItem } from "../../shared/library-dto";
+import { pathKey } from "../../shared/path-key";
 
 export type WorkspaceItem = PatchItem | GroupItem;
 export type WorkspaceItemReference =
@@ -33,9 +34,7 @@ export function isRootPatch(item: WorkspaceItem): item is PatchItem {
 }
 
 export function workspaceItemKey(item: WorkspaceItem): string {
-  return item.kind === "group"
-    ? `group:${item.id}`
-    : `patch:${item.relativePath.replaceAll("/", "\\").toLocaleLowerCase()}`;
+  return item.kind === "group" ? `group:${item.id}` : `patch:${pathKey(item.relativePath)}`;
 }
 
 export function workspaceItemReference(item: WorkspaceItem): WorkspaceItemReference {

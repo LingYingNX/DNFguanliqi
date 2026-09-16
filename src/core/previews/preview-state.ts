@@ -1,7 +1,8 @@
-import { ok, type Result } from "../../shared/result";
+import type { Result } from "../../shared/result";
 import {
   type AtomicJsonStore,
   createAtomicJsonStore,
+  readOrFallback,
   type StateStoreError,
 } from "../state/atomic-json-store";
 import { emptyPreviewState, type PreviewState, PreviewStateSchema } from "../state/schemas";
@@ -13,8 +14,7 @@ export function createPreviewStateStore(file: string): AtomicJsonStore<PreviewSt
 export async function readPreviewState(
   store: AtomicJsonStore<PreviewState>,
 ): Promise<Result<PreviewState, StateStoreError>> {
-  const result = await store.read();
-  return result.ok || result.error.code !== "STATE_MISSING" ? result : ok(emptyPreviewState());
+  return readOrFallback(store, emptyPreviewState);
 }
 
 class PreviewStateWriteError extends Error {

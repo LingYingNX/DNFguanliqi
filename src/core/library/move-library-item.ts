@@ -1,6 +1,7 @@
 import { lstat, readdir, rename } from "node:fs/promises";
 import { win32 } from "node:path";
 import type { DataRoot, LibraryRoot } from "../../main/app-paths";
+import { pathKey } from "../../shared/path-key";
 import { err, ok, type Result } from "../../shared/result";
 import type { FileTransactionError, FileTransactionStep } from "../filesystem/file-transaction";
 import { executeFileTransaction } from "../filesystem/file-transaction";
@@ -12,6 +13,7 @@ import {
   type VirtualGroupServiceError,
 } from "../groups/group-service";
 import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path";
+import { isNpkPath } from "../paths/relative-path";
 import { LibraryItemNameSchema } from "./library-item-name";
 import { findMatchingPreview } from "./library-preview";
 
@@ -66,10 +68,7 @@ export type MoveLibraryItemOverrides = {
 };
 
 function isSamePath(left: string, right: string): boolean {
-  return (
-    left.replaceAll("/", "\\").toLocaleLowerCase() ===
-    right.replaceAll("/", "\\").toLocaleLowerCase()
-  );
+  return pathKey(left) === pathKey(right);
 }
 
 function groupsFor(
@@ -174,10 +173,7 @@ export async function prepareMoveLibraryItem(
         const target = resolveLibraryPath(request.libraryRoot, targetRelativePath);
         if (!target.ok) return target;
         const metadata = await lstat(source.value);
-        if (
-          !metadata.isFile() ||
-          win32.extname(sourceRelativePath).toLocaleLowerCase() !== ".npk"
-        ) {
+        if (!metadata.isFile() || !isNpkPath(sourceRelativePath)) {
           return err({ code: "SOURCE_TYPE_MISMATCH", relativePath: sourceRelativePath });
         }
         if (!isSamePath(source.value, target.value) && (await pathExists(target.value))) {
@@ -249,14 +245,14 @@ export async function prepareMoveLibraryItem(
     if (!source.ok) return source;
     const sourceName = win32.basename(sourceRelativePath);
     const parsedName = LibraryItemNameSchema.safeParse(request.newName ?? sourceName);
-    if (!parsedName.success || win32.extname(parsedName.data).toLocaleLowerCase() !== ".npk") {
+    if (!parsedName.success || !isNpkPath(parsedName.data)) {
       return err({ code: "INVALID_ITEM_NAME" });
     }
     const targetRelativePath = win32.join(request.targetDirectoryRelativePath, parsedName.data);
     const target = resolveLibraryPath(request.libraryRoot, targetRelativePath);
     if (!target.ok) return target;
     const metadata = await lstat(source.value);
-    if (!metadata.isFile() || win32.extname(sourceName).toLocaleLowerCase() !== ".npk") {
+    if (!metadata.isFile() || !isNpkPath(sourceName)) {
       return err({ code: "SOURCE_TYPE_MISMATCH", relativePath: sourceRelativePath });
     }
     if (!isSamePath(source.value, target.value) && (await pathExists(target.value))) {

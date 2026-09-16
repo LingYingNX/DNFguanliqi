@@ -7,11 +7,8 @@ import type {
   GroupSnapshot,
   PatchItem,
 } from "../../shared/library-dto";
+import { pathKey } from "../../shared/path-key";
 import { err, ok, type Result } from "../../shared/result";
-
-function pathKey(value: string): string {
-  return value.replaceAll("/", "\\").toLocaleLowerCase();
-}
 
 export type GroupMemberPaths = ReadonlyMap<string, readonly string[]>;
 

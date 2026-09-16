@@ -2,8 +2,9 @@ import { lstat, mkdir, rename, rm } from "node:fs/promises";
 import { win32 } from "node:path";
 import { err, ok, type Result } from "../../shared/result";
 import type { FileTransactionStep } from "../filesystem/file-transaction";
-import { pathExists } from "../filesystem/path-exists";
+import { isNotFoundError, pathExists } from "../filesystem/path-exists";
 import { resolveLibraryPath } from "../paths/library-path";
+import { isNpkPath, normalizedPathKey } from "../paths/relative-path";
 import { type RecycleEntry, RecycleEntrySchema, type RecycleManifest } from "../state/schemas";
 import {
   readRecycleManifest,
@@ -35,7 +36,7 @@ export async function prepareRecycleItems(
   if (items.length === 0) return err({ code: "RECYCLE_IO" });
   const identities = items.map((item) =>
     item.kind === "patch"
-      ? `patch:${win32.normalize(item.relativePath).toLocaleLowerCase()}`
+      ? `patch:${normalizedPathKey(item.relativePath)}`
       : `group:${item.groupId.toLocaleLowerCase()}`,
   );
   if (new Set(identities).size !== identities.length) return err({ code: "RECYCLE_IO" });
@@ -55,8 +56,7 @@ export async function prepareRecycleItems(
       const source = resolveLibraryPath(context.libraryRoot, item.relativePath);
       if (!source.ok) return source;
       const metadata = await lstat(source.value);
-      const matches =
-        metadata.isFile() && win32.extname(source.value).toLocaleLowerCase() === ".npk";
+      const matches = metadata.isFile() && isNpkPath(source.value);
       if (!matches) return err({ code: "SOURCE_TYPE_MISMATCH", relativePath: item.relativePath });
 
       const id = context.createId();
@@ -136,7 +136,7 @@ async function expandRecycleItems(
   const seenPaths = new Set<string>();
   for (const item of items) {
     if (item.kind === "patch") {
-      const key = win32.normalize(item.relativePath).toLocaleLowerCase();
+      const key = normalizedPathKey(item.relativePath);
       if (seenPaths.has(key)) return err({ code: "RECYCLE_IO" });
       seenPaths.add(key);
       expanded.push(item);
@@ -151,10 +151,10 @@ async function expandRecycleItems(
       if (!source.ok) return source;
       try {
         const metadata = await lstat(source.value);
-        if (!metadata.isFile() || win32.extname(relativePath).toLocaleLowerCase() !== ".npk") {
+        if (!metadata.isFile() || !isNpkPath(relativePath)) {
           continue;
         }
-        const key = win32.normalize(relativePath).toLocaleLowerCase();
+        const key = normalizedPathKey(relativePath);
         if (seenPaths.has(key)) return err({ code: "RECYCLE_IO" });
         seenPaths.add(key);
         expanded.push({ kind: "patch", relativePath });
@@ -165,13 +165,4 @@ async function expandRecycleItems(
     }
   }
   return ok({ items: expanded, groupIds });
-}
-
-function isNotFoundError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { readonly code?: unknown }).code === "ENOENT"
-  );
 }

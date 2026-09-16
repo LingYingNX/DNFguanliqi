@@ -7,6 +7,7 @@ import { createAsyncMutex } from "../concurrency/async-mutex";
 import type { FileTransactionStep } from "../filesystem/file-transaction";
 import { LibraryItemNameSchema } from "../library/library-item-name";
 import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path";
+import { isNpkPath, normalizedPathKey, parentRelativePath } from "../paths/relative-path";
 import type { StateStoreError } from "../state/atomic-json-store";
 import {
   createVirtualGroupsStore,
@@ -19,7 +20,7 @@ import {
 const mutationMutexesByStateFile = new Map<string, ReturnType<typeof createAsyncMutex>>();
 
 function mutationMutexForStateFile(file: string): ReturnType<typeof createAsyncMutex> {
-  const key = win32.normalize(file).toLocaleLowerCase();
+  const key = normalizedPathKey(file);
   const existing = mutationMutexesByStateFile.get(key);
   if (existing !== undefined) return existing;
   const mutex = createAsyncMutex();
@@ -106,15 +107,6 @@ export type CreateVirtualGroupServiceOptions = {
 function normalizeCategoryRelativePath(relativePath: string): string {
   const normalized = normalizeVirtualGroupRelativePath(relativePath);
   return normalized === "." ? "" : normalized;
-}
-
-function parentRelativePath(relativePath: string): string {
-  const parent = win32.dirname(relativePath);
-  return parent === "." ? "" : parent;
-}
-
-function hasNpkExtension(relativePath: string): boolean {
-  return win32.extname(relativePath).toLocaleLowerCase() === ".npk";
 }
 
 function isSameRelativePath(left: string, right: string): boolean {
@@ -279,11 +271,11 @@ export function createVirtualGroupService(
           }
           members.add(key);
           if (
-            !hasNpkExtension(memberRelativePath) ||
+            !isNpkPath(memberRelativePath) ||
             !isSameRelativePath(parentRelativePath(memberRelativePath), categoryRelativePath)
           ) {
             return err({
-              code: hasNpkExtension(memberRelativePath)
+              code: isNpkPath(memberRelativePath)
                 ? "GROUP_MEMBER_OUTSIDE_CATEGORY"
                 : "INVALID_GROUP_MEMBER",
               relativePath: memberRelativePath,
@@ -359,11 +351,11 @@ export function createVirtualGroupService(
         for (const memberRelativePath of normalizedMembers) {
           const key = virtualGroupMemberPathKey(memberRelativePath);
           if (
-            !hasNpkExtension(memberRelativePath) ||
+            !isNpkPath(memberRelativePath) ||
             !isSameRelativePath(parentRelativePath(memberRelativePath), target.categoryRelativePath)
           ) {
             return err({
-              code: hasNpkExtension(memberRelativePath)
+              code: isNpkPath(memberRelativePath)
                 ? "GROUP_MEMBER_OUTSIDE_CATEGORY"
                 : "INVALID_GROUP_MEMBER",
               relativePath: memberRelativePath,

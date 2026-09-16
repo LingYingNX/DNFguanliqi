@@ -1,9 +1,11 @@
 import { lstat, mkdir, readdir, rename, rm, rmdir } from "node:fs/promises";
 import { win32 } from "node:path";
 import type { LibraryRoot } from "../../main/app-paths";
+import { isPathWithinKey } from "../../shared/path-key";
 import { err, ok, type Result } from "../../shared/result";
 import { pathExists } from "../filesystem/path-exists";
 import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path";
+import { parentRelativePath } from "../paths/relative-path";
 import { readGroupMarker } from "./group-marker";
 import { LibraryItemNameSchema } from "./library-item-name";
 
@@ -50,15 +52,11 @@ function normalizeRelativePath(relativePath: string): string {
   return normalized === "." ? "" : normalized;
 }
 
-function parentRelativePath(relativePath: string): string {
-  const parent = win32.dirname(relativePath);
-  return parent === "." ? "" : parent;
-}
-
 function isPathWithin(relativePath: string, parentRelativePath: string): boolean {
-  const normalizedPath = normalizeRelativePath(relativePath).toLocaleLowerCase();
-  const normalizedParent = normalizeRelativePath(parentRelativePath).toLocaleLowerCase();
-  return normalizedPath === normalizedParent || normalizedPath.startsWith(`${normalizedParent}\\`);
+  return isPathWithinKey(
+    normalizeRelativePath(relativePath).toLocaleLowerCase(),
+    normalizeRelativePath(parentRelativePath).toLocaleLowerCase(),
+  );
 }
 
 export function createCategoryCommands(libraryRoot: LibraryRoot): CategoryCommands {

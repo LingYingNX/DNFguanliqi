@@ -1,15 +1,18 @@
 import { lstat, readdir } from "node:fs/promises";
 import { win32 } from "node:path";
 import type { LibraryRoot } from "../../main/app-paths";
+import { pathKey } from "../../shared/path-key";
 import { err, ok, type Result } from "../../shared/result";
 import type { ManagedImageAssets, ManagedImageError } from "../assets/managed-image-assets";
 import type { FileTransactionStep } from "../filesystem/file-transaction";
+import { isNotFoundError } from "../filesystem/path-exists";
 import {
   copyLibraryPreview,
   findMatchingPreview,
   type LibraryPreviewError,
 } from "../library/library-preview";
 import { resolveLibraryPath } from "../paths/library-path";
+import { isNpkPath } from "../paths/relative-path";
 import type { AtomicJsonStore, StateStoreError } from "../state/atomic-json-store";
 import type { PreviewState } from "../state/schemas";
 import { readPreviewState, writePreviewState } from "./preview-state";
@@ -88,10 +91,6 @@ type PreviewServiceOptions = {
   readonly store: AtomicJsonStore<PreviewState>;
 };
 
-function pathKey(value: string): string {
-  return value.replaceAll("/", "\\").toLocaleLowerCase();
-}
-
 function identity(item: PreviewBindingReference): string {
   return item.kind === "patch"
     ? `patch:${pathKey(item.relativePath)}`
@@ -121,18 +120,13 @@ async function hasMatchingLibraryPreview(
   if (!patch.ok) return patch;
   try {
     const [metadata, fileNames] = await Promise.all([lstat(patch.value), readdir(directory.value)]);
-    if (!metadata.isFile() || win32.extname(relativePath).toLocaleLowerCase() !== ".npk") {
+    if (!metadata.isFile() || !isNpkPath(relativePath)) {
       return ok(null);
     }
     const baseName = win32.basename(relativePath, win32.extname(relativePath));
     return ok(findMatchingPreview(fileNames, baseName) !== null);
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { readonly code?: unknown }).code === "ENOENT"
-    ) {
+    if (isNotFoundError(error)) {
       return ok(null);
     }
     if (error instanceof Error) {

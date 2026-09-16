@@ -31,6 +31,17 @@ function stateIo(file: string): Result<never, StateStoreError> {
   return err({ code: "STATE_IO", file });
 }
 
+/**
+ * 读取状态，文件尚未创建时回退到默认值；其它错误原样返回。
+ */
+export async function readOrFallback<T>(
+  store: AtomicJsonStore<T>,
+  fallback: () => T,
+): Promise<Result<T, StateStoreError>> {
+  const result = await store.read();
+  return result.ok || result.error.code !== "STATE_MISSING" ? result : ok(fallback());
+}
+
 export function createAtomicJsonStore<T>(
   file: string,
   schema: ZodType<T>,

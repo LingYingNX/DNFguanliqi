@@ -1,5 +1,6 @@
 import { FileWarning, Layers, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { pathKey } from "../../shared/path-key";
 import type { PresetSummary } from "../../shared/preset-contracts";
 import type { WorkspaceItem } from "../workspace/model";
 import { StatusBadge } from "./primitives";
@@ -16,19 +17,15 @@ type PresetWorkspaceProps = {
   readonly workspaceLoading: boolean;
 };
 
-function normalizePath(relativePath: string): string {
-  return relativePath.replaceAll("/", "\\").toLocaleLowerCase();
-}
-
 function isPresetEnabled(preset: PresetSummary, workspaceItems: readonly WorkspaceItem[]): boolean {
   if (preset.items.length === 0 || preset.missingPaths.length > 0) return false;
 
   const enabledByPath = new Map(
     workspaceItems.flatMap((item) =>
-      item.kind === "patch" ? [[normalizePath(item.relativePath), item.enabled] as const] : [],
+      item.kind === "patch" ? [[pathKey(item.relativePath), item.enabled] as const] : [],
     ),
   );
-  return preset.items.every((item) => enabledByPath.get(normalizePath(item.relativePath)) === true);
+  return preset.items.every((item) => enabledByPath.get(pathKey(item.relativePath)) === true);
 }
 
 export function PresetWorkspace({

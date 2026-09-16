@@ -8,10 +8,12 @@ import type {
   GroupSnapshot,
   PatchItem,
 } from "../../shared/library-dto";
+import { pathKey } from "../../shared/path-key";
 import { err, ok, type Result } from "../../shared/result";
 import type { VirtualGroupService, VirtualGroupServiceError } from "../groups/group-service";
 import type { VirtualGroup } from "../groups/group-state";
 import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path";
+import { isNpkPath } from "../paths/relative-path";
 import { readGroupMarker } from "./group-marker";
 import { findMatchingPreview, libraryPreviewUrl } from "./library-preview";
 
@@ -32,14 +34,6 @@ function byName<T extends { readonly name: string }>(left: T, right: T): number 
 
 function byRelativePath<T extends { readonly relativePath: string }>(left: T, right: T): number {
   return left.relativePath.localeCompare(right.relativePath, "zh-CN");
-}
-
-function pathKey(relativePath: string): string {
-  return relativePath.replaceAll("/", "\\").toLocaleLowerCase();
-}
-
-function isNpk(name: string): boolean {
-  return win32.extname(name).toLocaleLowerCase() === ".npk";
 }
 
 function orderCategories(
@@ -72,7 +66,7 @@ async function scanPatchFiles(
 ): Promise<PatchItem[]> {
   const patchNames = fileNames.filter(
     (name) =>
-      isNpk(name) &&
+      isNpkPath(name) &&
       (includedFileNames === undefined || includedFileNames.has(pathKey(name))) &&
       !excludedRelativePaths.has(pathKey(win32.join(relativePath, name))),
   );
@@ -142,8 +136,7 @@ async function scanGroupItem(
     .map((candidate) => candidate.name);
   const groupPreview = findMatchingPreview(groupFileNames, marker.displayName);
   const patchCount = groupEntries.filter(
-    (candidate) =>
-      candidate.isFile() && win32.extname(candidate.name).toLocaleLowerCase() === ".npk",
+    (candidate) => candidate.isFile() && isNpkPath(candidate.name),
   ).length;
   return {
     kind: "group",
@@ -277,7 +270,7 @@ export async function scanGroup(
         ),
       )
       .map((member) => win32.basename(member))
-      .filter(isNpk)
+      .filter(isNpkPath)
       .sort((left, right) => left.localeCompare(right, "zh-CN"));
     const patches = await scanPatchFiles(
       category.value,
@@ -387,8 +380,7 @@ async function scanCategoryTree(
       if ((await readGroupMarker(directory)) !== null) {
         const groupEntries = await readdir(directory, { withFileTypes: true });
         groupedPatchCount += groupEntries.filter(
-          (candidate) =>
-            candidate.isFile() && win32.extname(candidate.name).toLocaleLowerCase() === ".npk",
+          (candidate) => candidate.isFile() && isNpkPath(candidate.name),
         ).length;
         continue;
       }
@@ -408,7 +400,7 @@ async function scanCategoryTree(
         entries.filter(
           (entry) =>
             entry.isFile() &&
-            win32.extname(entry.name).toLocaleLowerCase() === ".npk" &&
+            isNpkPath(entry.name) &&
             !groupedMembers.has(pathKey(win32.join(relativePath, entry.name))),
         ).length +
         virtualGroups.value.length +

@@ -15,6 +15,7 @@ import type {
 import { err, ok, type Result } from "../../shared/result";
 import type { InstallService, InstallServiceError } from "../install/install-service";
 import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path";
+import { isNpkPath } from "../paths/relative-path";
 import type { AtomicJsonStore, StateStoreError } from "../state/atomic-json-store";
 import type { PresetState } from "./preset-state";
 
@@ -123,10 +124,7 @@ export function createPresetService(options: PresetServiceOptions): PresetServic
 
     try {
       const metadata = await stat(resolved.value);
-      if (
-        !metadata.isFile() ||
-        win32.extname(normalizedReference.relativePath).toLocaleLowerCase() !== ".npk"
-      ) {
+      if (!metadata.isFile() || !isNpkPath(normalizedReference.relativePath)) {
         return err({
           code: "PRESET_ITEM_INVALID",
           relativePath: normalizedReference.relativePath,

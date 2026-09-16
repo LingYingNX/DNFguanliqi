@@ -53,15 +53,7 @@ export interface LibraryLifecycleService {
     request: Omit<MoveLibraryPatchRequest, "libraryRoot">,
   ): Promise<Result<{ readonly relativePath: string }, LibraryLifecycleError>>;
   recycle(
-    request:
-      | {
-          readonly kind: "patch";
-          readonly relativePath: string;
-        }
-      | {
-          readonly kind: "group";
-          readonly groupId: string;
-        },
+    request: RecycleItem,
   ): Promise<Result<{ readonly entry: RecycleEntry }, LibraryLifecycleError>>;
   dissolveGroup(request: {
     readonly groupId: string;

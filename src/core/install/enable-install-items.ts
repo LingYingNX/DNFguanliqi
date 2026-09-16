@@ -5,6 +5,7 @@ import { err, ok, type Result } from "../../shared/result";
 import type { FileTransactionStep } from "../filesystem/file-transaction";
 import { hashFile } from "../filesystem/hash-file";
 import { pathExists } from "../filesystem/path-exists";
+import { normalizedPathKey } from "../paths/relative-path";
 import type { InstallationRecord, InstallationState } from "../state/schemas";
 import { rejectDuplicateItems } from "./install-item-identity";
 import type { InstallBatchContext, InstallItem, InstallServiceError } from "./install-service";
@@ -97,7 +98,7 @@ async function buildCandidates(
   const targetNames = new Set<string>();
   const candidates: EnableCandidate[] = [];
   for (const source of sources) {
-    const sourcePath = win32.normalize(source.sourceRelativePath).toLocaleLowerCase();
+    const sourcePath = normalizedPathKey(source.sourceRelativePath);
     if (sourcePaths.has(sourcePath))
       return err({ code: "DUPLICATE_ITEM", relativePath: source.sourceRelativePath });
     sourcePaths.add(sourcePath);

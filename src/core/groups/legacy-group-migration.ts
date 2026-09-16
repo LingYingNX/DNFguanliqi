@@ -2,12 +2,15 @@ import type { Dirent } from "node:fs";
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { win32 } from "node:path";
 import type { LibraryRoot } from "../../main/app-paths";
+import { pathKey } from "../../shared/path-key";
 import { err, ok, type Result } from "../../shared/result";
 import type { FileTransactionError, FileTransactionStep } from "../filesystem/file-transaction";
 import { executeFileTransaction } from "../filesystem/file-transaction";
+import { isNotFoundError } from "../filesystem/path-exists";
 import { type GroupMarker, readGroupMarker } from "../library/group-marker";
 import { findMatchingPreview, LIBRARY_PREVIEW_EXTENSIONS } from "../library/library-preview";
 import type { LibraryPathError } from "../paths/library-path";
+import { isNpkPath } from "../paths/relative-path";
 import type { PreviewService, PreviewServiceError } from "../previews/preview-service";
 import type { VirtualGroupService, VirtualGroupServiceError } from "./group-service";
 
@@ -39,23 +42,6 @@ export type LegacyGroupMigrationError =
   | { readonly code: "LEGACY_GROUP_CONFLICT"; readonly relativePath: string }
   | { readonly code: "LEGACY_GROUP_INVALID"; readonly relativePath: string }
   | { readonly code: "LEGACY_GROUP_IO"; readonly relativePath: string };
-
-function pathKey(relativePath: string): string {
-  return relativePath.replaceAll("/", "\\").toLocaleLowerCase();
-}
-
-function isNpk(name: string): boolean {
-  return win32.extname(name).toLocaleLowerCase() === ".npk";
-}
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { readonly code?: unknown }).code === "ENOENT"
-  );
-}
 
 async function discoverLegacyGroups(
   libraryRoot: LibraryRoot,
@@ -119,7 +105,7 @@ async function prepareLegacyGroup(
       readFile(markerPath, "utf8"),
     ]);
     const fileNames = entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
-    const memberNames = fileNames.filter(isNpk);
+    const memberNames = fileNames.filter(isNpkPath);
     if (memberNames.length < 2) {
       return err({ code: "LEGACY_GROUP_INVALID", relativePath: directoryRelativePath });
     }
@@ -136,7 +122,7 @@ async function prepareLegacyGroup(
       const targetRelativePath = win32.join(categoryRelativePath, name);
       const sourcePath = win32.join(directoryPath, name);
       const metadata = await lstat(sourcePath);
-      if (!metadata.isFile() || !isNpk(name)) {
+      if (!metadata.isFile() || !isNpkPath(name)) {
         return err({ code: "LEGACY_GROUP_INVALID", relativePath: sourceRelativePath });
       }
       const targetPath = win32.join(win32.dirname(directoryPath), name);
@@ -177,7 +163,7 @@ async function prepareLegacyGroup(
       previewRelativePath,
     });
   } catch (error) {
-    if (error instanceof Error && isNotFound(error)) {
+    if (error instanceof Error && isNotFoundError(error)) {
       return err({ code: "LEGACY_GROUP_IO", relativePath: directoryRelativePath });
     }
     if (error instanceof Error) {
@@ -192,7 +178,7 @@ async function exists(path: string): Promise<boolean> {
     await lstat(path);
     return true;
   } catch (error) {
-    if (isNotFound(error)) return false;
+    if (isNotFoundError(error)) return false;
     throw error;
   }
 }

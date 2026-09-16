@@ -2,8 +2,10 @@ import { lstat } from "node:fs/promises";
 import { win32 } from "node:path";
 import type { LibraryRoot } from "../../main/app-paths";
 import { err, ok, type Result } from "../../shared/result";
+import { isNotFoundError } from "../filesystem/path-exists";
 import type { VirtualGroupService, VirtualGroupServiceError } from "../groups/group-service";
 import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path";
+import { isNpkPath } from "../paths/relative-path";
 
 export type InstallSource = {
   readonly name: string;
@@ -38,7 +40,7 @@ export async function resolveInstallSources(
       if (!source.ok) return source;
       try {
         const metadata = await lstat(source.value);
-        if (!metadata.isFile() || win32.extname(relativePath).toLocaleLowerCase() !== ".npk") {
+        if (!metadata.isFile() || !isNpkPath(relativePath)) {
           continue;
         }
         sources.push({
@@ -83,7 +85,7 @@ async function resolvePatchSource(
 
   try {
     const metadata = await lstat(source.value);
-    if (!metadata.isFile() || win32.extname(source.value).toLocaleLowerCase() !== ".npk") {
+    if (!metadata.isFile() || !isNpkPath(source.value)) {
       return err({ code: "SOURCE_TYPE_MISMATCH", relativePath });
     }
     return ok([
@@ -98,13 +100,4 @@ async function resolvePatchSource(
     if (error instanceof Error) return err({ code: "SOURCE_IO" });
     throw error;
   }
-}
-
-function isNotFoundError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { readonly code?: unknown }).code === "ENOENT"
-  );
 }

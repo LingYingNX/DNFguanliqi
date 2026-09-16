@@ -8,7 +8,7 @@ import {
   type FileTransactionError,
   type FileTransactionStep,
 } from "../filesystem/file-transaction";
-import { pathExists } from "../filesystem/path-exists";
+import { isNotFoundError, pathExists } from "../filesystem/path-exists";
 import type { VirtualGroupService, VirtualGroupServiceError } from "../groups/group-service";
 import { findMatchingPreview } from "../library/library-preview";
 import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path";
@@ -270,13 +270,4 @@ async function removeMatchingLibraryPreview(
   const previewName = findMatchingPreview(names, baseName);
   if (previewName === null) return;
   await rm(win32.join(directory.value, previewName), { force: true });
-}
-
-function isNotFoundError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { readonly code?: unknown }).code === "ENOENT"
-  );
 }

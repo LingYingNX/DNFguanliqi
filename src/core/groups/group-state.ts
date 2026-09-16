@@ -1,11 +1,11 @@
 import { win32 } from "node:path";
 import { z } from "zod";
-import { ok, type Result } from "../../shared/result";
 import { LibraryItemNameSchema } from "../library/library-item-name";
+import { isNpkPath, parentRelativePath } from "../paths/relative-path";
 import {
   type AtomicJsonStore,
   createAtomicJsonStore,
-  type StateStoreError,
+  readOrFallback,
 } from "../state/atomic-json-store";
 
 export function normalizeVirtualGroupRelativePath(relativePath: string): string {
@@ -23,11 +23,6 @@ function isCanonicalRelativePath(relativePath: string, allowEmpty: boolean): boo
   if (relativePath === "." || relativePath === "..") return false;
   if (relativePath.startsWith(`..${win32.sep}`)) return false;
   return relativePath === normalizeVirtualGroupRelativePath(relativePath);
-}
-
-function parentRelativePath(relativePath: string): string {
-  const parent = win32.dirname(relativePath);
-  return parent === "." ? "" : parent;
 }
 
 export const VirtualGroupSchema = z
@@ -53,7 +48,7 @@ export const VirtualGroupSchema = z
         });
         continue;
       }
-      if (win32.extname(memberRelativePath).toLocaleLowerCase() !== ".npk") {
+      if (!isNpkPath(memberRelativePath)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "A group member must be an NPK file.",
@@ -113,12 +108,7 @@ export function emptyVirtualGroupsState(): VirtualGroupsState {
 export function createVirtualGroupsStore(file: string): VirtualGroupsStore {
   const store = createAtomicJsonStore(file, VirtualGroupsStateSchema);
   return {
-    async read(): Promise<Result<VirtualGroupsState, StateStoreError>> {
-      const result = await store.read();
-      return result.ok || result.error.code !== "STATE_MISSING"
-        ? result
-        : ok(emptyVirtualGroupsState());
-    },
+    read: () => readOrFallback(store, emptyVirtualGroupsState),
     write(value) {
       return store.write(value);
     },
