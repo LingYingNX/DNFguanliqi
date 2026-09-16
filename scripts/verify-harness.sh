@@ -503,11 +503,18 @@ check_drift() {
     # Check if build/CI files changed in last commit
     local build_files_changed=false
     local agents_changed=false
+    local changed_dir=""
 
     while IFS= read -r changed_file; do
         case "$changed_file" in
             Makefile|composer.json|package.json|.github/workflows/*|.gitlab-ci.yml|.forgejo/workflows/*|.gitea/workflows/*)
                 build_files_changed=true
+                # Remember the deepest directory touched, so a scoped AGENTS.md
+                # beside it also counts as "documentation updated". Checking only
+                # the root AGENTS.md raised "No drift detected" when a workflow
+                # was added and .github/workflows/AGENTS.md was left stale.
+                changed_dir="${changed_file%/*}"
+                [[ "$changed_dir" == "$changed_file" ]] && changed_dir=""
                 ;;
             AGENTS.md)
                 agents_changed=true
@@ -515,8 +522,21 @@ check_drift() {
         esac
     done < <(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
 
+    # A scoped AGENTS.md in the touched directory (or an ancestor of it) also
+    # counts: scoped files are what carry directory-specific CI rules.
+    if [[ "$agents_changed" == false && -n "$changed_dir" ]]; then
+        while IFS= read -r scoped; do
+            [[ -z "$scoped" ]] && continue
+            scoped_dir="${scoped%/AGENTS.md}"
+            if [[ "$changed_dir" == "$scoped_dir"* ]]; then
+                agents_changed=true
+                break
+            fi
+        done < <(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '(^|/)AGENTS\.md$' || true)
+    fi
+
     if [[ "$build_files_changed" == true && "$agents_changed" == false ]]; then
-        warn 3 "Potential drift: build/CI files changed in last commit but AGENTS.md was not updated"
+        warn 3 "Potential drift: build/CI files changed in last commit but no AGENTS.md (root or matching scope) was updated"
     else
         pass 3 "No drift detected"
     fi

@@ -111,6 +111,7 @@ pnpm doctor                      # react-doctor 诊断
 - 复用已有辅助；仅当没有现成覆盖时才新增依赖。
 - **写路径/状态辅助前先查 `src/AGENTS.md` 的「禁止重复造路径/状态辅助」表**：路径比较、`.npk` 判断、`..` 穿越校验、ENOENT 捕获、状态读取回退都已有唯一共享实现，不得再写本地副本或内联等价表达式。该约束由 `scripts/check-path-helpers.mjs` 机器强制（pre-commit 与 CI 双端拦截，本地可跑 `pnpm verify:no-dup-helpers`）；钩子由 `prepare` 脚本在 `pnpm install` 时自动装上，新克隆后请确认 `git config core.hooksPath` 为 `.githooks`。
 - 新增行为补测试时，断言要能捕获回归：可用变异测试自检（改坏实现后确认断言变红），避免写出恒真的断言。
+- **建立或改变长期约定后，必须在同一次任务内完成三件事，不要等用户提醒**：① 把约定写进最近的 `AGENTS.md`；② 若可机器校验，加检查脚本并接入 pre-commit 与 CI；③ 新增/改动 CI 文件后同步更新对应 `AGENTS.md`（`.github/workflows/AGENTS.md`）。反例：2026-09 的全库精简消除了 52 处重复，但当时只清理了代码，未写规则也未加检查，用户不得不主动追问才补上。
 - 同一错误连续失败 3 次后停下上报：复现、已排除假设、阻塞点。
 
 ### Mem0（MCP：`mem0`）
