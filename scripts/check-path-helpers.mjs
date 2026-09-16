@@ -2,12 +2,15 @@
 /**
  * 阻止再次引入重复的路径/状态辅助实现。
  * 规则与例外说明见 src/AGENTS.md「禁止重复造路径/状态辅助」。
- * 由 .githooks/pre-commit 与 scripts/check-path-helpers 调用。
+ * 由 .githooks/pre-commit 与 .github/workflows/no-duplicate-helpers.yml 调用。
+ *
+ * 用法：node scripts/check-path-helpers.mjs [repoRoot]
+ * 省略 repoRoot 时取脚本所在仓库根；显式传入便于在测试沙箱中验证。
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
-const projectRoot = resolve(import.meta.dirname, "..");
+const projectRoot = resolve(process.argv[2] ?? join(import.meta.dirname, ".."));
 const srcRoot = join(projectRoot, "src");
 
 /** 每个共享辅助的唯一实现位置；在别处声明同名 function 视为复制。 */
@@ -62,8 +65,6 @@ const INLINE_PATTERNS = [
   },
 ];
 
-const FUNCTION_DECL = /^[ \t]*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*[(<]/u;
-
 function lineOf(text, index) {
   let line = 1;
   for (let i = 0; i < index; i += 1) {
@@ -92,7 +93,10 @@ function violationsIn(relPath, text) {
 
   for (const [name, allowed] of Object.entries(CANONICAL_FILES)) {
     if (allowed.includes(relPath)) continue;
-    const decl = new RegExp(`(?:^|\\n)[ \\t]*(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\s*[(<]`, "u");
+    const decl = new RegExp(
+      `(?:^|\\n)[ \\t]*(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\s*[(<]`,
+      "u",
+    );
     const match = decl.exec(text);
     if (match !== null) {
       found.push({
@@ -123,12 +127,6 @@ for (const file of files) {
   for (const violation of violationsIn(relPath, text)) {
     reports.push({ relPath, ...violation });
   }
-}
-
-// 保底：FUNCTION_DECL 若未被使用说明脚本逻辑失效，避免静默失去保护。
-if (FUNCTION_DECL.source.length === 0) {
-  console.warn("check-path-helpers: 内部检查表达式为空，已跳过");
-  process.exit(0);
 }
 
 if (reports.length === 0) {
