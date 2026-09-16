@@ -98,4 +98,138 @@ describe("category commands", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "确认删除" }));
     await waitFor(() => expect(request).toEqual({ relativePath: "分类A", confirmed: true }));
   });
+
+  it("deletes the folder targeted by the context menu", async () => {
+    let request: Parameters<DnfApi["deleteCategory"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      deleteCategory: async (input) => {
+        request = input;
+        return { ok: true, value: { relativePath: input.relativePath } };
+      },
+    };
+    render(<App api={api} />);
+    const category = await screen.findByRole("button", { name: "分类A" });
+    fireEvent.contextMenu(category, { clientX: 20, clientY: 20 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "删除文件夹" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(request).toEqual({ relativePath: "分类A", confirmed: true }));
+  });
+
+  it("warns before deleting a non-empty folder from the context menu", async () => {
+    let request: Parameters<DnfApi["deleteCategory"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi({
+        ...WORKSPACE_SNAPSHOT,
+        childCategories: [
+          { name: "分类A", relativePath: "分类A", patchCount: 1, childCategories: [] },
+        ],
+      }),
+      deleteCategory: async (input) => {
+        request = input;
+        return { ok: true, value: { relativePath: input.relativePath } };
+      },
+    };
+    render(<App api={api} />);
+    const category = await screen.findByRole("button", { name: "分类A" });
+    fireEvent.contextMenu(category, { clientX: 20, clientY: 20 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "删除文件夹" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: "警告" });
+    expect(dialog).toHaveTextContent("当前目录下还有补丁文件，是否确认删除");
+    expect(request).toBeUndefined();
+  });
+
+  it("opens the folder menu and changes its style", async () => {
+    let request: Parameters<DnfApi["setCategoryStyle"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      setCategoryStyle: async (input) => {
+        request = input;
+        return {
+          ok: true,
+          value: {
+            styles: input.style === undefined ? {} : { [input.relativePath]: input.style },
+            colors: {},
+            styleColors:
+              input.colorStyle === undefined || input.color === undefined
+                ? {}
+                : { [input.colorStyle]: input.color },
+          },
+        };
+      },
+    };
+    render(<App api={api} />);
+    const category = await screen.findByRole("button", { name: "分类A" });
+    fireEvent.contextMenu(category, { clientX: 20, clientY: 20 });
+
+    expect(screen.getByRole("menuitem", { name: "新增子文件夹" })).toBeInTheDocument();
+    const styleButton = screen.getByRole("button", { name: "设置文件夹外观：收藏文件夹" });
+    fireEvent.click(styleButton);
+    await waitFor(() => expect(request).toEqual({ relativePath: "分类A", style: "star" }));
+    fireEvent.change(screen.getByRole("slider", { name: "图标颜色" }), {
+      target: { value: "120" },
+    });
+    fireEvent.pointerUp(screen.getByRole("slider", { name: "图标颜色" }));
+    await waitFor(() =>
+      expect(request).toEqual({
+        relativePath: "分类A",
+        color: "#00ff00",
+        colorStyle: "star",
+      }),
+    );
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("creates a child from the folder menu and enters rename mode", async () => {
+    let createRequest: Parameters<DnfApi["createCategory"]>[0] | undefined;
+    let renameRequest: Parameters<DnfApi["renameCategory"]>[0] | undefined;
+    let created = false;
+    const nestedSnapshot = {
+      ...WORKSPACE_SNAPSHOT,
+      childCategories: [
+        {
+          name: "分类A",
+          relativePath: "分类A",
+          patchCount: 0,
+          childCategories: [
+            {
+              name: "新建文件夹",
+              relativePath: "分类A\\新建文件夹",
+              patchCount: 0,
+              childCategories: [],
+            },
+          ],
+        },
+      ],
+    };
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      createCategory: async (input) => {
+        createRequest = input;
+        created = true;
+        return { ok: true, value: { relativePath: "分类A\\新建文件夹" } };
+      },
+      renameCategory: async (input) => {
+        renameRequest = input;
+        return { ok: true, value: { relativePath: "分类A\\新名称" } };
+      },
+      scan: async ({ relativePath }) => ({
+        ok: true,
+        value: relativePath === "" && created ? nestedSnapshot : WORKSPACE_SNAPSHOT,
+      }),
+    };
+    render(<App api={api} />);
+    const category = await screen.findByRole("button", { name: "分类A" });
+    fireEvent.contextMenu(category, { clientX: 20, clientY: 20 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "新增子文件夹" }));
+
+    const input = await screen.findByRole("textbox", { name: "重命名 新建文件夹" });
+    expect(createRequest).toEqual({ parentRelativePath: "分类A", name: "新建文件夹" });
+    fireEvent.change(input, { target: { value: "新名称" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() =>
+      expect(renameRequest).toEqual({ relativePath: "分类A\\新建文件夹", name: "新名称" }),
+    );
+  });
 });

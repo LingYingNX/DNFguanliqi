@@ -78,20 +78,31 @@ const PROJECT_LINKS = [
   },
 ] as const;
 
-const UPDATE_STATUS: Record<AppUpdate["phase"], string> = {
-  idle: "点击检查更新获取最新版本",
-  checking: "正在检查更新",
-  available: "已检测到新版本",
-  current: "当前版本已是最新版",
-  downloading: "正在下载更新",
-  downloaded: "更新包下载完成",
-  failed: "更新失败",
-};
+function updateStatusText(update: AppUpdate): string {
+  const latestVersion = update.latestVersion === null ? "" : ` v${update.latestVersion}`;
+  switch (update.phase) {
+    case "available":
+      return `已检测到新版本${latestVersion}`;
+    case "checking":
+      return "正在检查更新";
+    case "current":
+      return "当前版本已是最新版";
+    case "downloading":
+      return `正在下载更新 (${update.progress}%)`;
+    case "downloaded":
+      return "下载完成，点击重启安装";
+    case "failed":
+      return update.message ?? "更新失败";
+    default:
+      return "点击检查更新获取最新版本";
+  }
+}
 
 export function SettingsDialog(props: Props): React.JSX.Element {
   const [section, setSection] = useState<SettingsSection>("general");
   const [draft, setDraft] = useState(props.gameDirectory ?? "");
   const update = props.update;
+  const showProgressBar = update.phase === "downloading" || update.phase === "downloaded";
   const progressValue =
     update.phase === "downloaded" ? 100 : update.phase === "downloading" ? update.progress : 0;
 
@@ -198,53 +209,41 @@ export function SettingsDialog(props: Props): React.JSX.Element {
               <section className="settings-detail-section">
                 <article className="settings-update-card">
                   <div className="settings-update-header">
-                    <div>
-                      <h3>软件更新</h3>
-                      <span className="settings-update-status">
-                        {update.phase === "available" && update.latestVersion !== null
-                          ? `已检测到新版本 v${update.latestVersion}`
-                          : (update.message ?? UPDATE_STATUS[update.phase])}
-                      </span>
-                    </div>
-                    <div className="settings-version-stack">
-                      <span className="settings-version-badge">
-                        当前版本 v{props.currentVersion}
-                      </span>
-                      <span className="settings-latest-version">
-                        最新版本 v{update.latestVersion ?? props.currentVersion}
-                      </span>
-                    </div>
+                    <h3>软件更新</h3>
+                    <span className="settings-version-badge">当前版本 v{props.currentVersion}</span>
                   </div>
                   <div className="settings-changelog-heading">更新说明</div>
-                  <ul className="settings-changelog">
-                    {update.releaseNotes.length > 0 ? (
-                      update.releaseNotes.map((entry) => <li key={entry}>{entry}</li>)
-                    ) : (
-                      <li>暂无发行说明</li>
-                    )}
-                  </ul>
+                  <div className="settings-changelog-box">
+                    <ul className="settings-changelog">
+                      {update.releaseNotes.length > 0 ? (
+                        update.releaseNotes.map((entry) => <li key={entry}>{entry}</li>)
+                      ) : (
+                        <li>暂无发行说明</li>
+                      )}
+                    </ul>
+                  </div>
                   <div className="settings-update-footer">
-                    <div className="settings-progress-info">
-                      <span>
-                        {update.phase === "downloading"
-                          ? `正在下载更新 (${update.progress}%)`
-                          : update.phase === "downloaded"
-                            ? "下载完成，点击重启安装"
-                            : "更新进度"}
-                      </span>
-                      <span>{progressValue}%</span>
+                    <div className="settings-update-progress-stack">
+                      <div className="settings-progress-info">
+                        <span>{updateStatusText(update)}</span>
+                        {showProgressBar ? <span>{progressValue}%</span> : null}
+                      </div>
+                      {showProgressBar ? (
+                        <progress
+                          aria-label="更新进度"
+                          className="settings-update-progress"
+                          max={100}
+                          value={progressValue}
+                        />
+                      ) : (
+                        <div aria-hidden="true" className="settings-update-progress-placeholder" />
+                      )}
                     </div>
-                    <progress
-                      aria-label="更新进度"
-                      className="settings-update-progress"
-                      max={100}
-                      value={progressValue}
-                    />
                     <div className="settings-update-actions">
                       <button
                         className="settings-update-secondary"
                         disabled={update.phase === "checking" || update.phase === "downloading"}
-                        onClick={() => void update.check()}
+                        onClick={() => void update.check(true)}
                         type="button"
                       >
                         <RefreshCw aria-hidden="true" size={14} />

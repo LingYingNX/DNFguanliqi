@@ -1,5 +1,7 @@
 import { ChevronDown, ChevronRight, Folder } from "lucide-react";
+import type { CategoryFolderStyle } from "../../shared/category-styles";
 import type { ChildCategory } from "../../shared/library-dto";
+import { isPathWithin } from "../../shared/path-key";
 import { decodeWorkspaceItemDrag, LIBRARY_ITEMS_DRAG_TYPE } from "../workspace/item-drag";
 import type { WorkspaceItemReference } from "../workspace/model";
 
@@ -22,6 +24,9 @@ export type CategoryDropTarget = {
 type CategoryTreeProps = {
   readonly categories: readonly ChildCategory[];
   readonly categoryPath: string;
+  readonly editingRelativePath: string | null;
+  readonly folderStyles: Readonly<Record<string, CategoryFolderStyle>>;
+  readonly folderColors: Readonly<Record<string, string>>;
   readonly depth?: number;
   readonly expandedPaths: ReadonlySet<string>;
   readonly dragSourceRelativePath: string | null;
@@ -35,11 +40,43 @@ type CategoryTreeProps = {
   readonly onItemDragOver: (relativePath: string) => void;
   readonly onCategoryDragOver: (target: CategoryDropTarget) => void;
   readonly onCategoryDragStart: (drag: CategoryDragState) => void;
+  readonly onCancelRename: () => void;
+  readonly onContextMenu: (relativePath: string, x: number, y: number) => void;
+  readonly onRename: (relativePath: string, name: string) => void;
   readonly onSelect: (relativePath: string) => void;
   readonly onToggle: (relativePath: string) => void;
   readonly parentRelativePath?: string;
   readonly readOnly: boolean;
 };
+
+export const folderStyleIcons: Record<CategoryFolderStyle, string> = {
+  "blue-outline": new URL("../assets/category-folder-icons/folder-blue.svg", import.meta.url).href,
+  star: new URL("../assets/category-folder-icons/folder-star.svg", import.meta.url).href,
+  outline: new URL("../assets/category-folder-icons/folder-outline.svg", import.meta.url).href,
+  add: new URL("../assets/category-folder-icons/folder-add.svg", import.meta.url).href,
+};
+
+function CategoryFolderIcon({
+  color,
+  style,
+}: {
+  readonly color: string | undefined;
+  readonly style: CategoryFolderStyle | undefined;
+}): React.JSX.Element {
+  return style === undefined ? (
+    <Folder className="category-folder-icon" size={16} />
+  ) : (
+    <span
+      aria-hidden="true"
+      className="category-folder-icon category-folder-image"
+      style={{
+        backgroundColor: color ?? "var(--color-primary)",
+        maskImage: `url("${folderStyleIcons[style]}")`,
+        WebkitMaskImage: `url("${folderStyleIcons[style]}")`,
+      }}
+    />
+  );
+}
 
 export function reorderedCategories(
   categories: readonly ChildCategory[],
@@ -67,19 +104,47 @@ function dropPosition(event: React.PointerEvent<HTMLButtonElement>): CategoryDro
   return "inside";
 }
 
-function isPathWithin(relativePath: string, parentRelativePath: string): boolean {
-  const path = relativePath.replaceAll("/", "\\").toLocaleLowerCase();
-  const parent = parentRelativePath.replaceAll("/", "\\").toLocaleLowerCase();
-  return path === parent || path.startsWith(`${parent}\\`);
-}
-
 function isLibraryItemsDrag(dataTransfer: DataTransfer): boolean {
   return Array.from(dataTransfer.types).includes(LIBRARY_ITEMS_DRAG_TYPE);
+}
+
+function resolveDropTarget(
+  event: React.PointerEvent<HTMLButtonElement>,
+  category: ChildCategory,
+  context: {
+    readonly dragSourceRelativePath: string;
+    readonly parentRelativePath: string;
+    readonly visibleCategories: readonly ChildCategory[];
+  },
+): CategoryDropTarget | null {
+  const { dragSourceRelativePath, parentRelativePath, visibleCategories } = context;
+  if (isPathWithin(category.relativePath, dragSourceRelativePath)) return null;
+  const position = dropPosition(event);
+  const targetCategories = position === "inside" ? category.childCategories : visibleCategories;
+  const withoutSource = targetCategories.filter(
+    (candidate) => candidate.relativePath !== dragSourceRelativePath,
+  );
+  const targetIndex =
+    position === "inside"
+      ? withoutSource.length
+      : withoutSource.findIndex((candidate) => candidate.relativePath === category.relativePath) +
+        (position === "after" ? 1 : 0);
+  if (targetIndex < 0) return null;
+  return {
+    position,
+    targetCategories,
+    targetIndex,
+    targetParentRelativePath: position === "inside" ? category.relativePath : parentRelativePath,
+    targetRelativePath: category.relativePath,
+  };
 }
 
 export function CategoryTree({
   categories,
   categoryPath,
+  editingRelativePath,
+  folderColors,
+  folderStyles,
   depth = 0,
   dragSourceRelativePath,
   dropTarget,
@@ -90,6 +155,9 @@ export function CategoryTree({
   onItemDragOver,
   onCategoryDragOver,
   onCategoryDragStart,
+  onCancelRename,
+  onContextMenu,
+  onRename,
   onSelect,
   onToggle,
   parentRelativePath = "",
@@ -97,14 +165,24 @@ export function CategoryTree({
 }: CategoryTreeProps): React.JSX.Element {
   const visibleCategories = categories;
   return (
-    <div className="category-tree">
+    <div className="category-tree" data-depth={depth}>
       {visibleCategories.map((category) => {
         const hasChildren = category.childCategories.length > 0;
         const expanded = expandedPaths.has(category.relativePath);
         const itemDropTarget = itemDropTargetRelativePath === category.relativePath;
+        const editing = editingRelativePath === category.relativePath;
+        const updateCategoryDragOver = (event: React.PointerEvent<HTMLButtonElement>): void => {
+          if (event.buttons !== 1 || dragSourceRelativePath === null) return;
+          const target = resolveDropTarget(event, category, {
+            dragSourceRelativePath,
+            parentRelativePath,
+            visibleCategories,
+          });
+          if (target !== null) onCategoryDragOver(target);
+        };
         return (
           <div className="category-node" key={category.relativePath}>
-            <div className="category-node-line" style={{ paddingLeft: depth * 14 }}>
+            <div className={`category-node-line ${hasChildren ? "has-toggle" : "leaf"}`}>
               {hasChildren ? (
                 <button
                   aria-label={`${expanded ? "折叠" : "展开"} ${category.name}`}
@@ -112,124 +190,117 @@ export function CategoryTree({
                   onClick={() => onToggle(category.relativePath)}
                   type="button"
                 >
-                  {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  {expanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
                 </button>
               ) : (
                 <span className="category-expand-spacer" />
               )}
-              <button
-                aria-label={category.name}
-                className={`category-row ${categoryPath === category.relativePath ? "selected" : ""} ${dropTarget?.targetRelativePath === category.relativePath ? `drop-${dropTarget.position}` : ""} ${itemDropTarget ? "item-drop-target" : ""}`}
-                data-item-drop-target={itemDropTarget ? "true" : undefined}
-                data-drop-position={
-                  dropTarget?.targetRelativePath === category.relativePath
-                    ? dropTarget.position
-                    : undefined
-                }
-                onClick={() => onSelect(category.relativePath)}
-                onDragEnter={(event) => {
-                  if (readOnly || !isLibraryItemsDrag(event.dataTransfer)) return;
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                  onItemDragOver(category.relativePath);
-                }}
-                onDragLeave={(event) => {
-                  if (
-                    event.relatedTarget instanceof Node &&
-                    event.currentTarget.contains(event.relatedTarget)
-                  ) {
-                    return;
+              {editing ? (
+                <div className="category-row category-row-editing">
+                  <CategoryFolderIcon
+                    color={folderColors[category.relativePath]}
+                    style={folderStyles[category.relativePath]}
+                  />
+                  <input
+                    aria-label={`重命名 ${category.name}`}
+                    defaultValue={category.name}
+                    onBlur={onCancelRename}
+                    onFocus={(event) => event.currentTarget.select()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        onCancelRename();
+                      }
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        const name = event.currentTarget.value.trim();
+                        if (name === "" || name === category.name) onCancelRename();
+                        else onRename(category.relativePath, name);
+                      }
+                    }}
+                    ref={(node) => {
+                      if (node !== null) {
+                        node.focus();
+                        node.select();
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <button
+                  aria-label={category.name}
+                  className={`category-row ${categoryPath === category.relativePath ? "selected" : ""} ${dropTarget?.targetRelativePath === category.relativePath ? `drop-${dropTarget.position}` : ""} ${itemDropTarget ? "item-drop-target" : ""}`}
+                  data-item-drop-target={itemDropTarget ? "true" : undefined}
+                  data-drop-position={
+                    dropTarget?.targetRelativePath === category.relativePath
+                      ? dropTarget.position
+                      : undefined
                   }
-                  onItemDragLeave();
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  if (readOnly || !isLibraryItemsDrag(event.dataTransfer)) {
-                    return;
-                  }
-                  event.dataTransfer.dropEffect = "move";
-                  onItemDragOver(category.relativePath);
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  onItemDragLeave();
-                  if (readOnly) return;
-                  const items = decodeWorkspaceItemDrag(
-                    event.dataTransfer.getData(LIBRARY_ITEMS_DRAG_TYPE),
-                  );
-                  if (items.length > 0) onMoveItems(category.relativePath, items);
-                }}
-                onPointerDown={(event) => {
-                  if (readOnly || event.buttons !== 1) return;
-                  onCategoryDragStart({
-                    sourceCategories: visibleCategories,
-                    sourceParentRelativePath: parentRelativePath,
-                    sourceRelativePath: category.relativePath,
-                  });
-                }}
-                onPointerEnter={(event) => {
-                  if (event.buttons !== 1 || dragSourceRelativePath === null) return;
-                  if (isPathWithin(category.relativePath, dragSourceRelativePath)) return;
-                  const position = dropPosition(event);
-                  const targetCategories =
-                    position === "inside" ? category.childCategories : visibleCategories;
-                  const withoutSource = targetCategories.filter(
-                    (candidate) => candidate.relativePath !== dragSourceRelativePath,
-                  );
-                  const targetIndex =
-                    position === "inside"
-                      ? withoutSource.length
-                      : withoutSource.findIndex(
-                          (candidate) => candidate.relativePath === category.relativePath,
-                        ) + (position === "after" ? 1 : 0);
-                  if (targetIndex < 0) return;
-                  onCategoryDragOver({
-                    position,
-                    targetCategories,
-                    targetIndex,
-                    targetParentRelativePath:
-                      position === "inside" ? category.relativePath : parentRelativePath,
-                    targetRelativePath: category.relativePath,
-                  });
-                }}
-                onPointerMove={(event) => {
-                  if (event.buttons !== 1 || dragSourceRelativePath === null) return;
-                  if (isPathWithin(category.relativePath, dragSourceRelativePath)) return;
-                  const position = dropPosition(event);
-                  const targetCategories =
-                    position === "inside" ? category.childCategories : visibleCategories;
-                  const withoutSource = targetCategories.filter(
-                    (candidate) => candidate.relativePath !== dragSourceRelativePath,
-                  );
-                  const targetIndex =
-                    position === "inside"
-                      ? withoutSource.length
-                      : withoutSource.findIndex(
-                          (candidate) => candidate.relativePath === category.relativePath,
-                        ) + (position === "after" ? 1 : 0);
-                  if (targetIndex < 0) return;
-                  onCategoryDragOver({
-                    position,
-                    targetCategories,
-                    targetIndex,
-                    targetParentRelativePath:
-                      position === "inside" ? category.relativePath : parentRelativePath,
-                    targetRelativePath: category.relativePath,
-                  });
-                }}
-                type="button"
-              >
-                <Folder size={16} />
-                <span>{category.name}</span>
-                <span aria-hidden="true" className="category-count">
-                  {category.patchCount}
-                </span>
-              </button>
+                  onClick={() => onSelect(category.relativePath)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    onContextMenu(category.relativePath, event.clientX, event.clientY);
+                  }}
+                  onDragEnter={(event) => {
+                    if (readOnly || !isLibraryItemsDrag(event.dataTransfer)) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    onItemDragOver(category.relativePath);
+                  }}
+                  onDragLeave={(event) => {
+                    if (
+                      event.relatedTarget instanceof Node &&
+                      event.currentTarget.contains(event.relatedTarget)
+                    ) {
+                      return;
+                    }
+                    onItemDragLeave();
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    if (readOnly || !isLibraryItemsDrag(event.dataTransfer)) return;
+                    event.dataTransfer.dropEffect = "move";
+                    onItemDragOver(category.relativePath);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    onItemDragLeave();
+                    if (readOnly) return;
+                    const items = decodeWorkspaceItemDrag(
+                      event.dataTransfer.getData(LIBRARY_ITEMS_DRAG_TYPE),
+                    );
+                    if (items.length > 0) onMoveItems(category.relativePath, items);
+                  }}
+                  onPointerDown={(event) => {
+                    if (readOnly || event.buttons !== 1) return;
+                    onCategoryDragStart({
+                      sourceCategories: visibleCategories,
+                      sourceParentRelativePath: parentRelativePath,
+                      sourceRelativePath: category.relativePath,
+                    });
+                  }}
+                  onPointerEnter={updateCategoryDragOver}
+                  onPointerMove={updateCategoryDragOver}
+                  type="button"
+                >
+                  <CategoryFolderIcon
+                    color={folderColors[category.relativePath]}
+                    style={folderStyles[category.relativePath]}
+                  />
+                  <span>{category.name}</span>
+                  <span aria-hidden="true" className="category-count">
+                    {category.patchCount}
+                  </span>
+                </button>
+              )}
             </div>
             {hasChildren && expanded ? (
               <CategoryTree
                 categories={category.childCategories}
                 categoryPath={categoryPath}
+                editingRelativePath={editingRelativePath}
+                folderStyles={folderStyles}
+                folderColors={folderColors}
                 depth={depth + 1}
                 dragSourceRelativePath={dragSourceRelativePath}
                 dropTarget={dropTarget}
@@ -240,6 +311,9 @@ export function CategoryTree({
                 onItemDragOver={onItemDragOver}
                 onCategoryDragOver={onCategoryDragOver}
                 onCategoryDragStart={onCategoryDragStart}
+                onCancelRename={onCancelRename}
+                onContextMenu={onContextMenu}
+                onRename={onRename}
                 onSelect={onSelect}
                 onToggle={onToggle}
                 parentRelativePath={category.relativePath}

@@ -1,12 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../src/renderer/App";
 import { createFakeApi, WORKSPACE_SNAPSHOT } from "./fake-api";
 
 const tokensCss = readFileSync(resolve(process.cwd(), "src/renderer/styles/tokens.css"), "utf8");
+const layoutCss = readFileSync(resolve(process.cwd(), "src/renderer/styles/layout.css"), "utf8");
 
 describe("appearance settings", () => {
   afterEach(cleanup);
@@ -34,7 +35,12 @@ describe("appearance settings", () => {
     expect(within(settingsDialog).getByRole("heading", { name: "软件更新" })).toBeInTheDocument();
     expect(within(settingsDialog).getByText("更新说明")).toBeInTheDocument();
     expect(within(settingsDialog).getByText("当前版本 v1.1.0")).toBeInTheDocument();
-    expect(within(settingsDialog).getByRole("progressbar", { name: "更新进度" })).toHaveValue(0);
+    expect(
+      within(settingsDialog).queryByRole("progressbar", { name: "更新进度" }),
+    ).not.toBeInTheDocument();
+    expect(
+      settingsDialog.querySelector(".settings-update-progress-placeholder"),
+    ).toBeInTheDocument();
     expect(within(settingsDialog).queryAllByRole("slider")).toHaveLength(0);
     expect(screen.queryByRole("dialog", { name: "调整外观" })).not.toBeInTheDocument();
 
@@ -99,20 +105,23 @@ describe("appearance settings", () => {
     fireEvent.click(screen.getByRole("tab", { name: "关于软件" }));
 
     const settingsDialog = screen.getByRole("dialog", { name: "设置" });
-    const progress = within(settingsDialog).getByRole("progressbar", { name: "更新进度" });
     fireEvent.click(within(settingsDialog).getByRole("button", { name: "检查更新" }));
 
-    expect(await within(settingsDialog).findByText("已检测到新版本 v9.9.9")).toBeInTheDocument();
-    expect(within(settingsDialog).getByText("最新版本 v9.9.9")).toBeInTheDocument();
-    expect(within(settingsDialog).getByText("新增项目地址与QQ群交流入口")).toBeInTheDocument();
-    expect(within(settingsDialog).getByText("优化软件更新提示")).toBeInTheDocument();
-
+    expect(
+      await screen.findByRole("status", { name: /发现新版本.*v9\.9\.9/u }),
+    ).toBeInTheDocument();
+    expect(within(settingsDialog).queryByText(/最新版本/u)).not.toBeInTheDocument();
+    expect(
+      within(settingsDialog).getByText("新增项目地址与QQ群交流入口，优化软件更新提示。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("当前版本发行说明")).not.toBeInTheDocument();
     fireEvent.click(within(settingsDialog).getByRole("button", { name: "立即更新" }));
+    const progress = within(settingsDialog).getByRole("progressbar", { name: "更新进度" });
     await waitFor(() => expect(progress).toHaveValue(100));
     expect(within(settingsDialog).getByRole("button", { name: "重启安装" })).toBeInTheDocument();
   });
 
-  it("shows the current-version message when no update is available", async () => {
+  it("hides the update notice when no update is available", async () => {
     const api = createFakeApi(WORKSPACE_SNAPSHOT);
     const check = async () => ({
       ok: true as const,
@@ -133,10 +142,36 @@ describe("appearance settings", () => {
     const settingsDialog = screen.getByRole("dialog", { name: "设置" });
     fireEvent.click(within(settingsDialog).getByRole("button", { name: "检查更新" }));
 
-    expect(await within(settingsDialog).findByText("当前版本已是最新版")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
     expect(within(settingsDialog).getByText("当前版本 v1.1.0")).toBeInTheDocument();
-    expect(within(settingsDialog).getByText("最新版本 v1.1.0")).toBeInTheDocument();
+    expect(within(settingsDialog).getByText("当前版本发行说明")).toBeInTheDocument();
+    expect(within(settingsDialog).queryByText(/最新版本/u)).not.toBeInTheDocument();
+    expect(within(settingsDialog).queryByText("当前版本已是最新版")).toBeInTheDocument();
+    expect(
+      settingsDialog.querySelector(".settings-update-progress-placeholder"),
+    ).toBeInTheDocument();
     expect(within(settingsDialog).getByRole("button", { name: "立即更新" })).toBeDisabled();
+  });
+
+  it("auto-hides the update notice after five seconds", async () => {
+    render(<App api={createFakeApi(WORKSPACE_SNAPSHOT)} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "设置" }));
+    fireEvent.click(screen.getByRole("tab", { name: "关于软件" }));
+    const settingsDialog = screen.getByRole("dialog", { name: "设置" });
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(within(settingsDialog).getByRole("button", { name: "检查更新" }));
+      });
+      expect(screen.getByRole("status", { name: /发现新版本.*v9\.9\.9/u })).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(5000));
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the close control in the content toolbar and closes on backdrop click", async () => {
@@ -367,6 +402,10 @@ describe("appearance settings", () => {
     );
     expect(document.documentElement.style.getPropertyValue("--color-text-primary")).toBe("");
     expect(tokensCss).toMatch(/:root\s*\{[\s\S]*color:\s*var\(--color-text-primary\);/u);
+    expect(layoutCss).toContain(".sidebar-system-nav :where(.category-row > span)");
+    expect(layoutCss).not.toMatch(
+      /\.category-tree\s*\{[^}]*color:\s*var\(--navigation-font-color\)/u,
+    );
   });
 
   it("supports keyboard editing in the font color bar", async () => {
@@ -402,6 +441,72 @@ describe("appearance settings", () => {
     await waitFor(() =>
       expect(update).toHaveBeenLastCalledWith(
         expect.objectContaining({ navigationFontColor: "#12AB34" }),
+      ),
+    );
+  });
+
+  it("resets each font color to its default", async () => {
+    const api = createFakeApi(WORKSPACE_SNAPSHOT);
+    const update = vi.fn(api.updateAppearance);
+    render(<App api={{ ...api, updateAppearance: update }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "调整外观" }));
+    fireEvent.click(screen.getByRole("button", { name: "字体外观" }));
+
+    const navigationPicker = screen.getByTestId("navigation-font-color-picker");
+    fireEvent.change(within(navigationPicker).getByRole("textbox"), {
+      target: { value: "#12AB34" },
+    });
+    await waitFor(() =>
+      expect(update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ navigationFontColor: "#12AB34" }),
+      ),
+    );
+
+    fireEvent.click(within(navigationPicker).getByRole("button", { name: "重置导航栏颜色" }));
+    await waitFor(() =>
+      expect(update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ navigationFontColor: "#F2F4F8" }),
+      ),
+    );
+
+    const patchCardPicker = screen.getByTestId("patch-card-font-color-picker");
+    fireEvent.change(within(patchCardPicker).getByRole("textbox"), {
+      target: { value: "#34AB12" },
+    });
+    await waitFor(() =>
+      expect(update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ patchCardFontColor: "#34AB12" }),
+      ),
+    );
+
+    fireEvent.click(within(patchCardPicker).getByRole("button", { name: "重置补丁卡片颜色" }));
+    await waitFor(() =>
+      expect(update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ patchCardFontColor: "#F2F4F8" }),
+      ),
+    );
+  });
+
+  it("resets font colors to the effective default in high contrast", async () => {
+    const api = createFakeApi(WORKSPACE_SNAPSHOT);
+    const update = vi.fn(api.updateAppearance);
+    render(<App api={{ ...api, updateAppearance: update }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "调整外观" }));
+    fireEvent.click(screen.getByRole("button", { name: "外观主题" }));
+    const appearanceDialog = screen.getByRole("dialog", { name: "调整外观" });
+    const themeCards =
+      appearanceDialog.querySelectorAll<HTMLButtonElement>(".appearance-theme-card");
+    fireEvent.click(themeCards[2] as HTMLButtonElement);
+    await waitFor(() =>
+      expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "high-contrast" })),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "字体外观" }));
+    const picker = screen.getByTestId("navigation-font-color-picker");
+    fireEvent.click(within(picker).getByRole("button", { name: "重置导航栏颜色" }));
+    await waitFor(() =>
+      expect(update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ navigationFontColor: "#FFFFFF" }),
       ),
     );
   });

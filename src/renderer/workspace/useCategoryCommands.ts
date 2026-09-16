@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { DnfApi, MoveCategoryRequest } from "../../shared/ipc-contracts";
+import { isPathWithin } from "../../shared/path-key";
 import type { Notice } from "./model";
 
 type CategoryCommandsContext = {
@@ -10,16 +11,6 @@ type CategoryCommandsContext = {
   readonly setCategoryPath: Dispatch<SetStateAction<string>>;
   readonly setNotice: Dispatch<SetStateAction<Notice | null>>;
 };
-
-function normalizeRelativePath(relativePath: string): string {
-  return relativePath.replaceAll("/", "\\").toLocaleLowerCase();
-}
-
-function isPathWithin(relativePath: string, parentRelativePath: string): boolean {
-  const path = normalizeRelativePath(relativePath);
-  const parent = normalizeRelativePath(parentRelativePath);
-  return path === parent || path.startsWith(`${parent}\\`);
-}
 
 function relocatePath(
   relativePath: string,
@@ -41,53 +32,66 @@ export function useCategoryCommands({
   setCategoryPath,
   setNotice,
 }: CategoryCommandsContext) {
-  const createCategory = async (name: string): Promise<boolean> => {
-    if (client === undefined) return false;
+  const createCategoryAt = async (
+    parentRelativePath: string,
+    name: string,
+  ): Promise<string | null> => {
+    if (client === undefined) return null;
     try {
-      const result = await client.createCategory({ parentRelativePath: categoryPath, name });
+      const result = await client.createCategory({ parentRelativePath, name });
       if (!result.ok) {
         setNotice({ tone: "error", message: result.error.message });
-        return false;
+        return null;
       }
-      if (!(await scan(categoryPath))) return false;
-      await scanNavigation("");
-      return true;
+      if (!(await scanNavigation(""))) return null;
+      return result.value.relativePath;
     } catch {
       setNotice({ tone: "error", message: "创建分类失败，补丁库未被修改。" });
-      return false;
+      return null;
+    }
+  };
+
+  const createCategory = async (name: string): Promise<boolean> =>
+    (await createCategoryAt(categoryPath, name)) !== null && (await scan(categoryPath));
+
+  const renameCategoryAt = async (relativePath: string, name: string): Promise<string | null> => {
+    if (client === undefined || relativePath === "") return null;
+    try {
+      const result = await client.renameCategory({ relativePath, name });
+      if (!result.ok) {
+        setNotice({ tone: "error", message: result.error.message });
+        return null;
+      }
+      if (!(await scanNavigation(""))) return null;
+      return result.value.relativePath;
+    } catch {
+      setNotice({ tone: "error", message: "重命名分类失败，补丁库未被修改。" });
+      return null;
     }
   };
 
   const renameCategory = async (name: string): Promise<boolean> => {
-    if (client === undefined || categoryPath === "") return false;
-    try {
-      const result = await client.renameCategory({ relativePath: categoryPath, name });
-      if (!result.ok) {
-        setNotice({ tone: "error", message: result.error.message });
-        return false;
-      }
-      setCategoryPath(result.value.relativePath);
-      await scanNavigation("");
-      return true;
-    } catch {
-      setNotice({ tone: "error", message: "重命名分类失败，补丁库未被修改。" });
-      return false;
-    }
+    const renamed = await renameCategoryAt(categoryPath, name);
+    if (renamed === null) return false;
+    setCategoryPath(renamed);
+    return true;
   };
 
-  const deleteCategory = async (): Promise<boolean> => {
-    if (client === undefined || categoryPath === "") return false;
+  const deleteCategoryAt = async (relativePath: string): Promise<boolean> => {
+    if (client === undefined || relativePath === "") return false;
     try {
-      const result = await client.deleteCategory({ relativePath: categoryPath, confirmed: true });
+      const result = await client.deleteCategory({ relativePath, confirmed: true });
       if (!result.ok) {
         setNotice({ tone: "error", message: result.error.message });
         return false;
       }
-      const separatorIndex = Math.max(
-        categoryPath.lastIndexOf("\\"),
-        categoryPath.lastIndexOf("/"),
-      );
-      setCategoryPath(separatorIndex < 0 ? "" : categoryPath.slice(0, separatorIndex));
+      if (isPathWithin(categoryPath, relativePath)) {
+        const separatorIndex = Math.max(
+          relativePath.lastIndexOf("\\"),
+          relativePath.lastIndexOf("/"),
+        );
+        setCategoryPath(separatorIndex < 0 ? "" : relativePath.slice(0, separatorIndex));
+      }
       await scanNavigation("");
       return true;
     } catch {
@@ -119,5 +123,12 @@ export function useCategoryCommands({
     }
   };
 
-  return { createCategory, deleteCategory, moveCategory, renameCategory };
+  return {
+    createCategory,
+    createCategoryAt,
+    deleteCategoryAt,
+    moveCategory,
+    renameCategory,
+    renameCategoryAt,
+  };
 }

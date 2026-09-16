@@ -6,6 +6,7 @@ import {
   readInstallationState,
 } from "../../core/install/installation-state";
 import { createCategoryOrderService } from "../../core/library/category-order-service";
+import { createCategoryStyleService } from "../../core/library/category-style-service";
 import { createPresetStateStore } from "../../core/presets/preset-state";
 import { createPreviewStateStore, readPreviewState } from "../../core/previews/preview-state";
 import {
@@ -28,6 +29,7 @@ const READ_CHANNELS = new Set<string>([
   IPC_CHANNELS.getGameDirectory,
   IPC_CHANNELS.getPreviewState,
   IPC_CHANNELS.getAppearance,
+  IPC_CHANNELS.getCategoryStyles,
   IPC_CHANNELS.getRecoveryState,
   IPC_CHANNELS.openExternalUrl,
   IPC_CHANNELS.presetsList,
@@ -41,6 +43,7 @@ export async function inspectRecoveryState(paths: AppPaths): Promise<RecoverySta
       createInstallationStateStore(win32.join(data, "installation-state.json")),
     ),
     createCategoryOrderService(win32.join(data, "category-order.json")).getAll(),
+    createCategoryStyleService(win32.join(data, "category-styles.json")).getAll(),
     readRecycleManifest(createRecycleManifestStore(win32.join(data, "recycle-bin.json"))),
     readPreviewState(createPreviewStateStore(win32.join(data, "previews.json"))),
     readWallpaperState(createWallpaperStateStore(win32.join(data, "wallpapers.json"))),

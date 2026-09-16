@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { isCategoryOrderForParent } from "../../shared/category-order";
+import {
+  CategoryFolderColorsSchema,
+  CategoryFolderStyleColorsSchema,
+  CategoryFolderStylesSchema,
+} from "../../shared/category-styles";
 
 export const RecycleEntrySchema = z.object({
   id: z.string().uuid(),
@@ -227,3 +232,12 @@ export const CategoryOrderStateSchema = z.object({
 });
 
 export type CategoryOrderState = z.infer<typeof CategoryOrderStateSchema>;
+
+export const CategoryStyleStateSchema = z.object({
+  formatVersion: z.literal(1),
+  styles: CategoryFolderStylesSchema,
+  colors: CategoryFolderColorsSchema.default({}),
+  styleColors: CategoryFolderStyleColorsSchema.default({}),
+});
+
+export type CategoryStyleState = z.infer<typeof CategoryStyleStateSchema>;

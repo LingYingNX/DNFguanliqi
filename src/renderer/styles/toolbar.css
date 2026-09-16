@@ -17,7 +17,8 @@
   height: var(--window-titlebar-height);
   align-items: center;
   color: var(--color-text-primary);
-  background: rgba(10, 11, 15, 0.58);
+  background: var(--color-canvas);
+  border-bottom: var(--section-divider-width) solid var(--color-border-strong);
 }
 
 .window-titlebar-drag-region {
@@ -56,6 +57,71 @@
   font-size: 14px;
   font-weight: 650;
   text-overflow: ellipsis;
+}
+
+.window-titlebar-update-notice {
+  position: absolute;
+  z-index: 3;
+  top: 6px;
+  left: 50%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 260px;
+  max-width: min(400px, calc(100vw - 240px));
+  height: 40px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 13px 0 8px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 42%, var(--color-border-strong));
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  opacity: 1;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: window-titlebar-update-notice-fade-out 500ms var(--easing-standard) 4500ms forwards;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px) saturate(135%);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
+}
+
+@keyframes window-titlebar-update-notice-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.window-titlebar-update-notice-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--color-primary-hover);
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.window-titlebar-update-notice-copy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.window-titlebar-update-notice-copy strong {
+  flex: 0 0 auto;
+  font-size: 14.3px;
+  font-weight: 650;
+}
+
+.window-titlebar-update-notice-copy span {
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .window-controls {

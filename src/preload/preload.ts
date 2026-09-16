@@ -5,11 +5,12 @@ import {
   UpdateAppearanceRequestSchema,
   WallpaperSlotRequestSchema,
 } from "../shared/appearance-contracts";
-import { APP_NAME, APP_VERSION } from "../shared/contracts";
+import { APP_NAME, APP_RELEASE_NOTES, APP_VERSION } from "../shared/contracts";
 import {
   AddGroupMembersRequestSchema,
   apiResultSchema,
   CategoryOrderRequestSchema,
+  CategoryStyleStateDtoSchema,
   CreateCategoryRequestSchema,
   CreateGroupRequestSchema,
   DeleteCategoryRequestSchema,
@@ -33,6 +34,7 @@ import {
   ScanGroupRequestSchema,
   ScanGroupResultSchema,
   ScanRequestSchema,
+  SetCategoryStyleRequestSchema,
   SetGameDirectoryRequestSchema,
   WindowStateSchema,
 } from "../shared/ipc-contracts";
@@ -66,6 +68,7 @@ const IdResultSchema = apiResultSchema(z.object({ id: z.string().uuid() }));
 const IdsResultSchema = apiResultSchema(z.object({ ids: z.array(z.string().uuid()) }));
 const PathResultSchema = apiResultSchema(z.object({ relativePath: z.string() }));
 const PathsResultSchema = apiResultSchema(z.object({ relativePaths: z.array(z.string()) }));
+const CategoryStylesResultSchema = apiResultSchema(CategoryStyleStateDtoSchema);
 const GroupResultSchema = apiResultSchema(
   z.object({ id: z.string().uuid(), categoryRelativePath: z.string() }),
 );
@@ -117,7 +120,7 @@ async function invoke<T>(
 }
 
 const api = {
-  appInfo: { name: APP_NAME, version: APP_VERSION },
+  appInfo: { name: APP_NAME, version: APP_VERSION, releaseNotes: APP_RELEASE_NOTES },
   scan: (request) => {
     ScanRequestSchema.parse(request);
     return invoke(IPC_CHANNELS.scan, apiResultSchema(CategorySnapshotSchema), request);
@@ -145,6 +148,11 @@ const api = {
       apiResultSchema(z.object({ orderedCount: z.number().int().nonnegative() })),
       request,
     );
+  },
+  getCategoryStyles: () => invoke(IPC_CHANNELS.getCategoryStyles, CategoryStylesResultSchema),
+  setCategoryStyle: (request) => {
+    SetCategoryStyleRequestSchema.parse(request);
+    return invoke(IPC_CHANNELS.setCategoryStyle, CategoryStylesResultSchema, request);
   },
   createGroup: (request) => {
     CreateGroupRequestSchema.parse(request);

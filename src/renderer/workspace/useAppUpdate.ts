@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { APP_RELEASE_NOTES } from "../../shared/contracts";
 import type { DnfApi } from "../../shared/ipc-contracts";
 
 export type AppUpdate = {
@@ -14,7 +15,9 @@ export type AppUpdate = {
   readonly releaseNotes: readonly string[];
   readonly progress: number;
   readonly message: string | null;
-  readonly check: () => Promise<void>;
+  readonly noticeKind: "available" | "current" | null;
+  readonly noticeSequence: number;
+  readonly check: (manual?: boolean) => Promise<void>;
   readonly download: () => Promise<void>;
   readonly install: () => Promise<void>;
 };
@@ -22,66 +25,80 @@ export type AppUpdate = {
 export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
   const [phase, setPhase] = useState<AppUpdate["phase"]>("idle");
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
-  const [releaseNotes, setReleaseNotes] = useState<readonly string[]>([]);
+  const [releaseNotes, setReleaseNotes] = useState<readonly string[]>(
+    client?.appInfo.releaseNotes ?? APP_RELEASE_NOTES,
+  );
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
+  const [noticeKind, setNoticeKind] = useState<AppUpdate["noticeKind"]>(null);
+  const [noticeSequence, setNoticeSequence] = useState(0);
+  const checkedClient = useRef<DnfApi | undefined>(undefined);
 
   useEffect(() => {
     if (client === undefined) return;
+    setReleaseNotes(client.appInfo.releaseNotes ?? APP_RELEASE_NOTES);
     return client.update.subscribe((event) => {
-      if (event.kind === "checking") {
-        setPhase("checking");
-        setMessage(null);
-        return;
+      switch (event.kind) {
+        case "checking":
+          // A late "checking" event must not hide a notice that a newer result already showed.
+          setPhase((current) => (current === "available" ? current : "checking"));
+          setMessage(null);
+          return;
+        case "available":
+          setPhase("available");
+          setLatestVersion(event.version);
+          setReleaseNotes(event.releaseNotes);
+          setMessage(null);
+          return;
+        case "current":
+          setPhase("current");
+          setLatestVersion(event.version);
+          if (event.releaseNotes.length > 0) setReleaseNotes(event.releaseNotes);
+          setProgress(0);
+          return;
+        case "downloading":
+          setPhase("downloading");
+          setProgress(event.percent);
+          return;
+        case "downloaded":
+          setPhase("downloaded");
+          setProgress(100);
+          return;
+        case "failed":
+          setPhase("failed");
+          setMessage(event.message);
       }
-      if (event.kind === "available") {
-        setPhase("available");
-        setLatestVersion(event.version);
-        setReleaseNotes(event.releaseNotes);
-        setMessage(null);
-        return;
-      }
-      if (event.kind === "current") {
-        setPhase("current");
-        setLatestVersion(event.version);
-        setReleaseNotes(event.releaseNotes);
-        setProgress(0);
-        return;
-      }
-      if (event.kind === "downloading") {
-        setPhase("downloading");
-        setProgress(event.percent);
-        return;
-      }
-      if (event.kind === "downloaded") {
-        setPhase("downloaded");
-        setProgress(100);
-        return;
-      }
-      setPhase("failed");
-      setMessage(event.message);
     });
   }, [client]);
 
-  const check = useCallback(async (): Promise<void> => {
-    if (client === undefined) return;
-    setPhase("checking");
-    setMessage(null);
-    try {
-      const result = await client.update.check();
-      if (!result.ok) {
+  const check = useCallback(
+    async (manual = false): Promise<void> => {
+      if (client === undefined) return;
+      setPhase("checking");
+      setMessage(null);
+      try {
+        const result = await client.update.check();
+        if (!result.ok) {
+          setPhase("failed");
+          setMessage(result.error.message);
+          return;
+        }
+        setLatestVersion(result.value.latestVersion);
+        if (result.value.updateAvailable || result.value.releaseNotes.length > 0) {
+          setReleaseNotes(result.value.releaseNotes);
+        }
+        if (result.value.updateAvailable || manual) {
+          setNoticeKind(result.value.updateAvailable ? "available" : "current");
+          setNoticeSequence((value) => value + 1);
+        }
+        setPhase(result.value.updateAvailable ? "available" : "current");
+      } catch {
         setPhase("failed");
-        setMessage(result.error.message);
-        return;
+        setMessage("检查更新失败，请检查网络后重试");
       }
-      setLatestVersion(result.value.latestVersion);
-      setReleaseNotes(result.value.releaseNotes);
-      setPhase(result.value.updateAvailable ? "available" : "current");
-    } catch {
-      setPhase("failed");
-      setMessage("检查更新失败，请检查网络后重试");
-    }
-  }, [client]);
+    },
+    [client],
+  );
 
   const download = useCallback(async (): Promise<void> => {
     if (client === undefined) return;
@@ -109,5 +126,22 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
     }
   }, [client]);
 
-  return { phase, latestVersion, releaseNotes, progress, message, check, download, install };
+  useEffect(() => {
+    if (client === undefined || checkedClient.current === client) return;
+    checkedClient.current = client;
+    void check();
+  }, [check, client]);
+
+  return {
+    phase,
+    latestVersion,
+    releaseNotes,
+    progress,
+    message,
+    noticeKind,
+    noticeSequence,
+    check,
+    download,
+    install,
+  };
 }

@@ -255,30 +255,11 @@
   gap: 12px;
 }
 
-.settings-update-header > div:first-child {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
 .settings-update-header h3 {
   margin: 0;
   color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 650;
-}
-
-.settings-update-status,
-.settings-latest-version {
-  color: var(--color-text-tertiary);
-  font-size: 11px;
-}
-
-.settings-version-stack {
-  display: grid;
-  flex: 0 0 auto;
-  justify-items: end;
-  gap: 3px;
 }
 
 .settings-version-badge {
@@ -301,6 +282,17 @@
   font-weight: 650;
 }
 
+.settings-changelog-box {
+  height: 200px;
+  min-height: 200px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 68%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--color-canvas) 32%, transparent);
+  scrollbar-gutter: stable;
+}
+
 .settings-changelog {
   display: grid;
   gap: 5px;
@@ -319,6 +311,16 @@
   display: grid;
   gap: 7px;
   padding-top: 2px;
+}
+
+.settings-update-progress-stack {
+  display: grid;
+  gap: 7px;
+}
+
+.settings-update-progress-placeholder {
+  height: 6px;
+  border-radius: 999px;
 }
 
 .settings-progress-info {
@@ -745,6 +747,13 @@
   background: transparent;
 }
 
+.appearance-font-color-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .appearance-font-color-bar {
   position: relative;
   height: 14px;
@@ -760,13 +769,38 @@
     #ff00ff 83%,
     #ff0000 100%
   );
-  cursor: ew-resize;
+  cursor: default;
   touch-action: none;
 }
 
 .appearance-font-color-bar:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 3px;
+}
+
+.appearance-font-color-reset {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  color: var(--color-text-secondary);
+  background: var(--color-elevated);
+  cursor: pointer;
+}
+
+.appearance-font-color-reset:hover,
+.appearance-font-color-reset:focus-visible {
+  border-color: var(--color-primary);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.appearance-font-color-reset svg {
+  width: 15px;
+  height: 15px;
 }
 
 .appearance-font-color-bar-marker {
@@ -874,7 +908,7 @@
 }
 
 .preview-halo {
-  background: linear-gradient(135deg, #070b14 0%, #0f172a 100%);
+  background: #151d2b;
 }
 
 .preview-high-contrast {

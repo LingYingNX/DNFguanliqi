@@ -17,7 +17,7 @@ function createWindow(): BrowserWindow {
     frame: false,
     title: "",
     autoHideMenuBar: true,
-    backgroundColor: "#0A0B0F",
+    backgroundColor: "#151D2B",
     show: false,
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/preload.cjs"),

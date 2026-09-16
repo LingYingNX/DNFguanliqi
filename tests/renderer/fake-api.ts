@@ -49,14 +49,18 @@ export function createFakeApi(snapshot: CategorySnapshot): DnfApi {
   };
 
   return {
-    appInfo: { name: "DNF 补丁管理器", version: "1.1.0" },
+    appInfo: {
+      name: "DNF 补丁管理器",
+      version: "1.1.0",
+      releaseNotes: ["当前版本发行说明"],
+    },
     update: {
       check: async () => {
         emitUpdate({ kind: "checking" });
         emitUpdate({
           kind: "available",
           version: "9.9.9",
-          releaseNotes: ["新增项目地址与QQ群交流入口", "优化软件更新提示"],
+          releaseNotes: ["新增项目地址与QQ群交流入口，优化软件更新提示。"],
         });
         return {
           ok: true,
@@ -64,7 +68,7 @@ export function createFakeApi(snapshot: CategorySnapshot): DnfApi {
             currentVersion: "1.1.0",
             latestVersion: "9.9.9",
             updateAvailable: true,
-            releaseNotes: ["新增项目地址与QQ群交流入口", "优化软件更新提示"],
+            releaseNotes: ["新增项目地址与QQ群交流入口，优化软件更新提示。"],
           },
         };
       },
@@ -108,6 +112,18 @@ export function createFakeApi(snapshot: CategorySnapshot): DnfApi {
     setCategoryOrder: async (request) => ({
       ok: true,
       value: { orderedCount: request.orderedChildRelativePaths.length },
+    }),
+    getCategoryStyles: async () => ({
+      ok: true,
+      value: { styles: {}, colors: {}, styleColors: {} },
+    }),
+    setCategoryStyle: async ({ relativePath, style }) => ({
+      ok: true,
+      value: {
+        styles: style === undefined ? {} : { [relativePath]: style },
+        colors: {},
+        styleColors: {},
+      },
     }),
     createGroup: async () => ({
       ok: true,

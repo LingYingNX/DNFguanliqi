@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DnfApi } from "../../shared/ipc-contracts";
 import type { CategorySnapshot, ChildCategory } from "../../shared/library-dto";
+import { pathKey } from "../../shared/path-key";
 import type { NavigationSelection, ViewMode } from "../workspace/model";
 import { useAppearance } from "../workspace/useAppearance";
 import { useAppUpdate } from "../workspace/useAppUpdate";
@@ -32,14 +33,13 @@ function moveTargets(
   if (snapshot === null) {
     return [];
   }
-  const normalizedCurrentPath = currentCategoryPath.replaceAll("/", "\\").toLocaleLowerCase();
+  const normalizedCurrentPath = pathKey(currentCategoryPath);
   const mapTargets = (categories: readonly ChildCategory[]): readonly MoveTarget[] =>
     categories.map((category) => ({
       children: mapTargets(category.childCategories),
       label: category.name,
       relativePath: category.relativePath,
-      disabled:
-        category.relativePath.replaceAll("/", "\\").toLocaleLowerCase() === normalizedCurrentPath,
+      disabled: pathKey(category.relativePath) === normalizedCurrentPath,
     }));
   return mapTargets(snapshot.childCategories);
 }
@@ -86,6 +86,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
   const [activeDialog, setActiveDialog] = useState<OperationDialog>(null);
   const [categoryDialog, setCategoryDialog] = useState<CategoryDialog>(null);
   const [categoryDeleteHasContents, setCategoryDeleteHasContents] = useState(false);
+  const [categoryDeletePath, setCategoryDeletePath] = useState("");
   const [presetDialog, setPresetDialog] = useState<PresetDialog>(null);
   const [operationBusy, setOperationBusy] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -229,9 +230,11 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       />
     );
 
+  const deletionTargetPath = categoryDeletePath || workspace.categoryPath;
+
   return (
     <div className="app-shell" data-read-only={recovery.readOnly}>
-      <WindowTitleBar client={client} />
+      <WindowTitleBar client={client} update={appUpdate} />
       {recovery.readOnly ? (
         <div className="recovery-banner" role="alert">
           状态文件损坏，当前为只读恢复模式。损坏文件：{recovery.files.join("；")}
@@ -240,14 +243,17 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       <div className="workspace-layout">
         <CategorySidebar
           categoryPath={workspace.categoryPath}
+          client={client}
           navigation={navigation}
           onCreateCategory={() => setCategoryDialog("create")}
-          onDeleteCategory={(hasContents) => {
+          onCreateCategoryAt={workspace.createCategoryAt}
+          onDeleteCategory={(relativePath, hasContents) => {
+            setCategoryDeletePath(relativePath);
             setCategoryDeleteHasContents(hasContents);
             if (hasContents) {
               setCategoryDialog("delete");
             } else {
-              void workspace.deleteCategory();
+              void workspace.deleteCategoryAt(relativePath);
             }
           }}
           onAppearance={() => setAppearanceOpen(true)}
@@ -264,6 +270,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
               .finally(() => setOperationBusy(false));
           }}
           onReorder={(parentPath, paths) => void workspace.setCategoryOrder(parentPath, paths)}
+          onRenameCategoryAt={workspace.renameCategoryAt}
           presetCount={presets.presets.length}
           readOnly={recovery.readOnly}
           onSelect={(relativePath) => navigate({ kind: "category", relativePath })}
@@ -282,9 +289,9 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       />
       <CategoryDialogs
         active={categoryDialog}
-        categoryPath={workspace.categoryPath}
+        categoryPath={deletionTargetPath}
         createCategory={workspace.createCategory}
-        deleteCategory={workspace.deleteCategory}
+        deleteCategory={() => workspace.deleteCategoryAt(deletionTargetPath)}
         hasContents={categoryDeleteHasContents}
         onClose={() => setCategoryDialog(null)}
         renameCategory={workspace.renameCategory}

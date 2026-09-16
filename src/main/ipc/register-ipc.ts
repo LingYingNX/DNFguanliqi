@@ -17,9 +17,11 @@ import {
   readInstallationState,
 } from "../../core/install/installation-state";
 import { createCategoryOrderService } from "../../core/library/category-order-service";
+import { createCategoryStyleService } from "../../core/library/category-style-service";
 import { createLibraryCommands } from "../../core/library/library-commands";
 import { scanCategory, scanGroup } from "../../core/library/scanner";
 import { resolveLibraryPath } from "../../core/paths/library-path";
+import { isNpkPath } from "../../core/paths/relative-path";
 import { createPreviewService } from "../../core/previews/preview-service";
 import { createPreviewStateStore } from "../../core/previews/preview-state";
 import { createRecycleService } from "../../core/recycle/recycle-service";
@@ -47,6 +49,7 @@ import type { AppPaths } from "../app-paths";
 import { apiError, toApiResult } from "./api-result";
 import { registerAppearanceIpc } from "./appearance-ipc";
 import { registerCategoryCommandIpc } from "./category-command-ipc";
+import { registerCategoryStyleIpc } from "./category-style-ipc";
 import { registerCategoryTransferIpc } from "./category-transfer-ipc";
 import {
   decorateGroupSnapshotWithInstallation,
@@ -126,7 +129,11 @@ export async function registerIpc(
   const categoryOrder = createCategoryOrderService(
     win32.join(paths.dataRoot, "category-order.json"),
   );
-  registerCategoryTransferIpc({ categoryOrder, paths });
+  const categoryStyle = createCategoryStyleService(
+    win32.join(paths.dataRoot, "category-styles.json"),
+  );
+  registerCategoryTransferIpc({ categoryOrder, categoryStyle, paths });
+  registerCategoryStyleIpc(categoryStyle);
 
   const mutationMutex = createAsyncMutex();
   const binding = await registerGameDirectoryIpc(window, paths, mutationMutex, groups);
@@ -153,9 +160,12 @@ export async function registerIpc(
     deleteCategory: (request) =>
       mutationMutex.runExclusive(async () => {
         const result = await categoryDelete.remove(request);
-        return result.ok ? result : toApiResult(result);
+        if (!result.ok) return toApiResult(result);
+        const styleResult = await categoryStyle.remove(request.relativePath);
+        return styleResult.ok ? result : toApiResult(styleResult);
       }),
     paths,
+    categoryStyle,
   });
   registerPresetIpc({ getInstallService, mutationMutex, paths });
   registerAppearanceIpc({ binding, mutationMutex, wallpaper, window });
@@ -234,7 +244,7 @@ export async function registerIpc(
   });
 
   register(IPC_CHANNELS.revealPatch, RevealPatchRequestSchema, async ({ relativePath }) => {
-    if (win32.extname(relativePath).toLocaleLowerCase() !== ".npk") {
+    if (!isNpkPath(relativePath)) {
       return { ok: false, error: apiError("INVALID_INPUT") };
     }
     const source = resolveLibraryPath(paths.libraryRoot, relativePath);

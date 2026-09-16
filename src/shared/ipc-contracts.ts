@@ -2,11 +2,19 @@ import { z } from "zod";
 import type { AppearanceApi } from "./appearance-contracts";
 import { isCategoryOrderForParent } from "./category-order";
 import {
+  CategoryColorSchema,
+  CategoryFolderColorsSchema,
+  CategoryFolderStyleColorsSchema,
+  CategoryFolderStyleSchema,
+  CategoryFolderStylesSchema,
+} from "./category-styles";
+import {
   type CategorySnapshot,
   CategorySnapshotSchema,
   type GroupSnapshot,
   GroupSnapshotSchema,
 } from "./library-dto";
+import { pathKey } from "./path-key";
 import type {
   AddItemsToPresetRequest,
   CreatePresetRequest,
@@ -18,14 +26,9 @@ import type {
 } from "./preset-contracts";
 import type { ActivePreviewDto, SelectItemPreviewRequestSchema } from "./preview-contracts";
 import type { RecoveryStateDto } from "./recovery-contracts";
+import { isSafeRelativePath } from "./relative-path-guard";
 import type { UpdateCheckResult, UpdateEvent } from "./update-contracts";
 
-function isSafeRelativePath(value: string): boolean {
-  if (/^[a-z]:[\\/]/iu.test(value) || value.startsWith("\\") || value.startsWith("/")) {
-    return false;
-  }
-  return !value.replaceAll("\\", "/").split("/").includes("..");
-}
 export const RelativePathSchema = z.string().max(1024).refine(isSafeRelativePath);
 export const ItemRelativePathSchema = RelativePathSchema.refine((value) => value.length > 0);
 export const ItemKindSchema = z.union([z.literal("patch"), z.literal("group")]);
@@ -139,7 +142,7 @@ export const MoveItemsRequestSchema = z.object({
         new Set(
           items.map((item) =>
             item.kind === "patch"
-              ? `patch:${item.sourceRelativePath.replaceAll("/", "\\").toLocaleLowerCase()}`
+              ? `patch:${pathKey(item.sourceRelativePath)}`
               : `group:${item.groupId.toLocaleLowerCase()}`,
           ),
         ).size === items.length,
@@ -179,7 +182,7 @@ export const InstallBatchRequestSchema = z.object({
         new Set(
           items.map((item) =>
             item.kind === "patch"
-              ? `patch:${item.relativePath.replaceAll("/", "\\").toLocaleLowerCase()}`
+              ? `patch:${pathKey(item.relativePath)}`
               : `group:${item.groupId.toLocaleLowerCase()}`,
           ),
         ).size === items.length,
@@ -207,6 +210,23 @@ export const CategoryOrderRequestSchema = z
   .refine(({ parentRelativePath, orderedChildRelativePaths }) =>
     isCategoryOrderForParent(parentRelativePath, orderedChildRelativePaths),
   );
+export const SetCategoryStyleRequestSchema = z
+  .object({
+    relativePath: ItemRelativePathSchema,
+    style: CategoryFolderStyleSchema.optional(),
+    colorStyle: CategoryFolderStyleSchema.optional(),
+    color: CategoryColorSchema.optional(),
+  })
+  .refine(
+    (value) =>
+      value.style !== undefined || value.color !== undefined || value.colorStyle !== undefined,
+  );
+export const CategoryStyleStateDtoSchema = z.object({
+  styles: CategoryFolderStylesSchema,
+  colors: CategoryFolderColorsSchema,
+  styleColors: CategoryFolderStyleColorsSchema,
+});
+export type CategoryStyleStateDto = z.infer<typeof CategoryStyleStateDtoSchema>;
 
 export const EmptyRecycleRequestSchema = z.object({
   confirmed: z.boolean(),
@@ -254,6 +274,8 @@ export const IPC_CHANNELS = {
   importDroppedPatches: "library:import-dropped-patches",
   revealPatch: "library:reveal-patch",
   setCategoryOrder: "library:set-category-order",
+  getCategoryStyles: "library:get-category-styles",
+  setCategoryStyle: "library:set-category-style",
   createGroup: "library:create-group",
   addGroupMembers: "library:add-group-members",
   dissolveGroup: "library:dissolve-group",
@@ -305,6 +327,7 @@ export type DnfApi = {
   readonly appInfo: {
     readonly name: string;
     readonly version: string;
+    readonly releaseNotes?: readonly string[];
   };
   readonly scan: (
     request: z.input<typeof ScanRequestSchema>,
@@ -322,6 +345,10 @@ export type DnfApi = {
   readonly setCategoryOrder: (
     request: z.input<typeof CategoryOrderRequestSchema>,
   ) => Promise<ApiResult<{ readonly orderedCount: number }>>;
+  readonly getCategoryStyles: () => Promise<ApiResult<CategoryStyleStateDto>>;
+  readonly setCategoryStyle: (
+    request: z.input<typeof SetCategoryStyleRequestSchema>,
+  ) => Promise<ApiResult<CategoryStyleStateDto>>;
   readonly createGroup: (
     request: z.input<typeof CreateGroupRequestSchema>,
   ) => Promise<ApiResult<{ readonly id: string; readonly categoryRelativePath: string }>>;

@@ -1,8 +1,12 @@
+<!-- FOR AI AGENTS - Human readability is a side effect, not a goal -->
+<!-- Managed by agent: keep sections and order; edit content, not structure -->
+<!-- Last updated: 2026-09-16 | Last verified: 2026-09-16 -->
+
 # AGENTS.md
 
 > 本文件面向 AI 代理/维护者，不是给人类用户看的用户手册。人类文档见 `docs/`。
->
-> Last updated: 2026-09-14
+
+**Precedence:** the closest `AGENTS.md` wins; root only holds global defaults. Explicit user prompts override these files.
 
 ## 项目概览
 
@@ -35,13 +39,14 @@ pnpm test:integration            # vitest run --config vitest.integration.config
 pnpm test:e2e                    # pnpm build && playwright test
 pnpm dist:portable               # 打包 portable 可执行文件
 pnpm dist:installer              # 打包 NSIS 安装包（可选安装路径）
+pnpm exec install-electron       # 发布/打包前准备 Electron 二进制
 pnpm release                     # 构建并发布 GitHub Release（需要 GH_TOKEN）
 pnpm verify:portable             # 校验 portable 产物
 pnpm verify:packaged             # 校验打包产物
 pnpm doctor                      # react-doctor 诊断
 ```
 
-日常启动：直接双击 `启动DNF补丁管理器.bat`（装依赖、补 Electron、构建过期产物，再启动）。`启动DNF补丁管理器.bat --check` 只做完整性校验，不启动应用。
+日常启动：直接双击 `启动DNF补丁管理器.bat`；构建产物齐全时会跳过检查并直接启动。源码更新后可用 `启动DNF补丁管理器.bat --check` 检查并按需构建，或用 `--repair` 强制重建。
 
 ## 目录结构
 
@@ -89,7 +94,9 @@ pnpm doctor                      # react-doctor 诊断
 - 源码仓库与发布物分离：提交 `src/`、配置、测试和必要脚本；不提交 `node_modules/`、`out/`、`dist/`、`data/`、用户补丁库、日志或本地 `.learnings/`。安装包、`latest.yml`、`.blockmap` 只上传到 GitHub Release。
 - 只上传源码时不要顺手改写 `README.md` 或其它说明文件；发布附件不是源码文件。
 - 发布前保持 `package.json` 的 `version`、`src/shared/contracts.ts` 的 `APP_VERSION`、Git 标签 `vX.Y.Z` 和 Release 中的 `latest.yml` 一致。同一版本的重打包不会触发现有安装的自动更新，修复更新必须递增版本号。
+- `pnpm install --frozen-lockfile` 不保证存在 `node_modules/electron/dist`；执行 `pnpm dist:installer` 或 `pnpm release` 前，发布环境必须先运行 `pnpm exec install-electron`。GitHub Actions 的发布流程也必须保留这一步。
 - `electron-updater` 从 GitHub Release 的安装包和 `latest.yml` 获取更新，不读取仓库源码；NSIS 更新安装目录必须沿用当前运行程序目录。
+- 自动更新只能用已安装的 NSIS 版本验证；源码目录的 `启动DNF补丁管理器.bat` 属于开发模式，不代表真实更新链路可用。更新日志默认来自 `src/shared/contracts.ts`，检测到新版本后才替换为 GitHub Release 说明。
 - `pnpm dist:installer` 用于验证 NSIS 安装器（包括可选安装路径）；`pnpm verify:portable` 与 `pnpm verify:packaged` 当前只覆盖 portable 产物，不能据此声称 NSIS 安装路径已验证。
 
 ### 工作范围
@@ -111,7 +118,16 @@ pnpm doctor                      # react-doctor 诊断
 - 架构/ADR：`docs/adr/`、`docs/superpowers/specs/`、`docs/superpowers/plans/`
 - 完成审计：`docs/verification/`
 - 学习/错误/功能记录：`.learnings/`
-- 外部知识库：`E:\BaiduSyncdisk\知识库\DNF补丁管理器`
+
+## Scoped AGENTS.md（进入对应目录前必须阅读）
+
+| 目录 | 作用 |
+|------|------|
+| [src/AGENTS.md](./src/AGENTS.md) | 主进程/预加载/渲染进程/core 的边界与依赖方向 |
+| [tests/AGENTS.md](./tests/AGENTS.md) | 测试分层、运行方式与断言约定 |
+| [.github/workflows/AGENTS.md](./.github/workflows/AGENTS.md) | CI 与发布流水线约束 |
+
+> 进入上述目录修改文件前，必须先读该目录的 `AGENTS.md`；其规则覆盖根文件。
 
 ## 任务边界
 

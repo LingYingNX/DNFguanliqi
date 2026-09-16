@@ -2,6 +2,7 @@ import { win32 } from "node:path";
 import { ipcMain } from "electron";
 import { createCategoryCommands } from "../../core/library/category-commands";
 import type { CategoryOrderService } from "../../core/library/category-order-service";
+import type { CategoryStyleService } from "../../core/library/category-style-service";
 import { importPatches } from "../../core/library/import-patches";
 import {
   CategoryOrderRequestSchema,
@@ -9,6 +10,7 @@ import {
   IPC_CHANNELS,
   MoveCategoryRequestSchema,
 } from "../../shared/ipc-contracts";
+import { pathKey } from "../../shared/path-key";
 import type { AppPaths } from "../app-paths";
 import { toApiResult } from "./api-result";
 import { createValidatedHandler } from "./validated-handler";
@@ -16,11 +18,13 @@ import { createValidatedHandler } from "./validated-handler";
 type CategoryTransferDependencies = {
   readonly categoryOrder: CategoryOrderService;
   readonly paths: AppPaths;
+  readonly categoryStyle?: CategoryStyleService;
 };
 
 export function registerCategoryTransferIpc({
   categoryOrder,
   paths,
+  categoryStyle,
 }: CategoryTransferDependencies): void {
   const categories = createCategoryCommands(paths.libraryRoot);
 
@@ -71,14 +75,12 @@ export function registerCategoryTransferIpc({
     );
     const targetAtIndex = request.targetParentChildRelativePaths[request.targetIndex];
     if (
-      normalizedSourceParent.toLocaleLowerCase() !==
-        request.sourceParentRelativePath.replaceAll("/", "\\").toLocaleLowerCase() ||
+      pathKey(normalizedSourceParent) !== pathKey(request.sourceParentRelativePath) ||
       request.sourceParentChildRelativePaths.some(
-        (path) =>
-          path.replaceAll("/", "\\").toLocaleLowerCase() === sourceRelativePath.toLocaleLowerCase(),
+        (path) => pathKey(path) === pathKey(sourceRelativePath),
       ) ||
-      targetAtIndex?.replaceAll("/", "\\").toLocaleLowerCase() !==
-        targetRelativePath.toLocaleLowerCase()
+      targetAtIndex === undefined ||
+      pathKey(targetAtIndex) !== pathKey(targetRelativePath)
     ) {
       return { ok: false, error: { code: "INVALID_INPUT", message: "请求参数无效" } };
     }
@@ -88,20 +90,39 @@ export function registerCategoryTransferIpc({
       targetParentRelativePath: request.targetParentRelativePath,
     });
     if (!moved.ok) return toApiResult(moved);
+    const movedRelativePath = moved.value.relativePath;
     const order = await categoryOrder.move({
       sourceRelativePath,
-      targetRelativePath: moved.value.relativePath,
+      targetRelativePath: movedRelativePath,
       sourceParentRelativePath: request.sourceParentRelativePath,
       sourceParentChildRelativePaths: request.sourceParentChildRelativePaths,
       targetParentRelativePath: request.targetParentRelativePath,
       targetParentChildRelativePaths: request.targetParentChildRelativePaths,
     });
-    if (!order.ok) {
+    const rollback = async (): Promise<void> => {
       await categories.move({
-        sourceRelativePath: moved.value.relativePath,
+        sourceRelativePath: movedRelativePath,
         targetParentRelativePath: request.sourceParentRelativePath,
       });
+    };
+    if (!order.ok) {
+      await rollback();
       return toApiResult(order);
+    }
+    if (categoryStyle !== undefined) {
+      const styles = await categoryStyle.relocate(sourceRelativePath, movedRelativePath);
+      if (!styles.ok) {
+        await rollback();
+        await categoryOrder.move({
+          sourceRelativePath: movedRelativePath,
+          targetRelativePath: sourceRelativePath,
+          sourceParentRelativePath: request.targetParentRelativePath,
+          sourceParentChildRelativePaths: request.targetParentChildRelativePaths,
+          targetParentRelativePath: request.sourceParentRelativePath,
+          targetParentChildRelativePaths: request.sourceParentChildRelativePaths,
+        });
+        return toApiResult(styles);
+      }
     }
     return { ok: true, value: moved.value };
   });
