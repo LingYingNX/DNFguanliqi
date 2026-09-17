@@ -11,8 +11,9 @@
   -webkit-backdrop-filter: blur(24px) saturate(130%);
 }
 
+/* 设置对话框不遮暗不虚化背景：backdrop 完全透明，仅承载居中布局。 */
 .settings-dialog-backdrop {
-  background: color-mix(in srgb, var(--color-canvas) 58%, transparent);
+  background: transparent;
 }
 
 .settings-dialog-layout {
@@ -298,7 +299,7 @@
   gap: 5px;
   margin: 0;
   padding: 0 0 0 17px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-primary);
   font-size: 11px;
   line-height: 1.45;
 }

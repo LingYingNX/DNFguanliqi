@@ -22,3 +22,4 @@ build/icon.png
 *.[nN][pP][kK]
 .DS_Store
 Thumbs.db
+.agents/

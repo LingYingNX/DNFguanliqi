@@ -47,7 +47,7 @@ pnpm verify:no-dup-helpers       # 拒绝重复的路径/状态辅助实现
 pnpm doctor                      # react-doctor 诊断
 ```
 
-日常启动：直接双击 `启动DNF补丁管理器.bat`；构建产物齐全时会跳过检查并直接启动。源码更新后可用 `启动DNF补丁管理器.bat --check` 检查并按需构建，或用 `--repair` 强制重建。
+日常启动：直接双击 `启动DNF补丁管理器.bat`；启动器自动对比 `src/`、`package.json`、`electron.vite.config.ts` 与 `out/` 产物的修改时间，源码较新时先执行 `pnpm build` 再启动，因此双击启动总能看到最新源码改动。`--check` 只检查并按需构建不启动，`--repair` 强制重建。
 
 ## 目录结构
 
@@ -113,6 +113,7 @@ pnpm doctor                      # react-doctor 诊断
 - 新增行为补测试时，断言要能捕获回归：可用变异测试自检（改坏实现后确认断言变红），避免写出恒真的断言。
 - **建立或改变长期约定后，必须在同一次任务内完成三件事，不要等用户提醒**：① 把约定写进最近的 `AGENTS.md`；② 若可机器校验，加检查脚本并接入 pre-commit 与 CI；③ 新增/改动 CI 文件后同步更新对应 `AGENTS.md`（`.github/workflows/AGENTS.md`）。反例：2026-09 的全库精简消除了 52 处重复，但当时只清理了代码，未写规则也未加检查，用户不得不主动追问才补上。
 - 同一错误连续失败 3 次后停下上报：复现、已排除假设、阻塞点。
+- **任务收尾时必须自查经验落盘，不要等用户提醒**：排查确认了非显而易见根因的 bug、或用非常规手段绕过环境/工具坑的经历，收尾前写入 `.learnings/ERRORS.md`（格式 `[ERR-YYYYMMDD-XXX]`，含 Summary/Error/Solution/Prevention 与 Recurrence-Count 等字段）。hook 注入的 `<error-detected>` / `<self-improvement-reminder>` 只是提醒信号，落盘动作由本条约束。反例：2026-09-17 修复开关闪烁时只记了环境坑（ERR-20260917-002），主根因（ERR-20260917-003）被用户追问才补上。
 
 ### Mem0（MCP：`mem0`）
 

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const CategoryFolderStyleSchema = z.enum(["blue-outline", "star", "outline", "add"]);
+export const CategoryFolderStyleSchema = z.enum([
+  "blue-outline",
+  "star",
+  "outline",
+  "add",
+  "music",
+]);
 
 export type CategoryFolderStyle = z.infer<typeof CategoryFolderStyleSchema>;
 

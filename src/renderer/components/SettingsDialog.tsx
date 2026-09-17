@@ -101,6 +101,9 @@ function updateStatusText(update: AppUpdate): string {
 export function SettingsDialog(props: Props): React.JSX.Element {
   const [section, setSection] = useState<SettingsSection>("general");
   const [draft, setDraft] = useState(props.gameDirectory ?? "");
+  // 记录已提交过但被拒绝的值：同一无效值反复失焦时不重复发起保存，
+  // 否则用户刚关掉的错误提示会被 onBlur 立刻写回，表现为"叉关不掉提示"。
+  const [rejectedCommit, setRejectedCommit] = useState<string | null>(null);
   const update = props.update;
   const showProgressBar = update.phase === "downloading" || update.phase === "downloaded";
   const progressValue =
@@ -108,12 +111,16 @@ export function SettingsDialog(props: Props): React.JSX.Element {
 
   useEffect(() => {
     setDraft(props.gameDirectory ?? "");
+    setRejectedCommit(null);
   }, [props.gameDirectory]);
 
   const commit = (): void => {
     const nextDirectory = draft.trim();
     if (nextDirectory.length === 0 || nextDirectory === (props.gameDirectory ?? "")) return;
-    void props.onSetGameDirectory(nextDirectory);
+    if (nextDirectory === rejectedCommit) return;
+    void props.onSetGameDirectory(nextDirectory).then((accepted) => {
+      setRejectedCommit(accepted ? null : nextDirectory);
+    });
   };
 
   return (
@@ -161,7 +168,6 @@ export function SettingsDialog(props: Props): React.JSX.Element {
               <section className="settings-detail-section">
                 <div className="settings-detail-heading">
                   <h3>游戏目录</h3>
-                  <p>选择 DNF 游戏目录，补丁启用和文件同步会使用这个位置。</p>
                 </div>
                 <div className="settings-path-row">
                   <input

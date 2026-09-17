@@ -9,6 +9,7 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   STATE_CORRUPTED: "应用状态损坏，已停止修改",
   GAME_DIRECTORY_REQUIRED: "请先选择 DNF 游戏目录",
   GAME_DIRECTORY_IN_USE: "请先停用所有补丁，再更换游戏目录",
+  GAME_ROOT_MISSING: "请设置到游戏根目录",
   CONFIRMATION_REQUIRED: "此操作需要明确确认",
   RECYCLE_ITEM_NOT_FOUND: "回收项目不存在",
   SOURCE_TYPE_MISMATCH: "源项目类型不符合请求",

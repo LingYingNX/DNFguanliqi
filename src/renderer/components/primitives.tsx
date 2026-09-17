@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Info, LoaderCircle, XCircle } from "lucide-react";
+import { AlertCircle, AlertTriangle, Check, Info, LoaderCircle, X } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export type CommandButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -84,6 +84,9 @@ export function StatusBadge({ children, tone = "neutral" }: StatusBadgeProps): R
 
 type ToastProps = {
   readonly children: ReactNode;
+  /** true 时进入淡出过渡，动画结束后由宿主卸载。 */
+  readonly dataLeaving?: boolean;
+  readonly onClose?: () => void;
   readonly tone: Exclude<StatusTone, "neutral">;
 };
 
@@ -91,15 +94,30 @@ const TOAST_ICONS = {
   success: Check,
   warning: AlertTriangle,
   info: Info,
-  error: XCircle,
+  error: AlertCircle,
 } as const;
 
-export function Toast({ children, tone }: ToastProps): React.JSX.Element {
+export function Toast({
+  children,
+  dataLeaving = false,
+  onClose,
+  tone,
+}: ToastProps): React.JSX.Element {
   const Icon = TOAST_ICONS[tone];
   return (
-    <div className="toast" data-tone={tone} role={tone === "error" ? "alert" : "status"}>
+    <div
+      className="toast"
+      data-leaving={dataLeaving ? "true" : undefined}
+      data-tone={tone}
+      role={tone === "error" ? "alert" : "status"}
+    >
       <Icon size={17} aria-hidden="true" />
       <span>{children}</span>
+      {onClose === undefined ? null : (
+        <button aria-label="关闭提示" className="toast-close" onClick={onClose} type="button">
+          <X aria-hidden="true" size={14} />
+        </button>
+      )}
     </div>
   );
 }

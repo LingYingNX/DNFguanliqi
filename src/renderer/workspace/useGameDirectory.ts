@@ -82,5 +82,5 @@ export function useGameDirectory(client: DnfApi | undefined) {
     }
   };
 
-  return { gameDirectory, loading, notice, save, select, selecting, saving };
+  return { gameDirectory, loading, notice, save, select, selecting, showNotice: setNotice, saving };
 }

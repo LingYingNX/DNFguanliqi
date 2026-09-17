@@ -82,6 +82,7 @@ type ItemWorkspaceProps = {
   readonly selectedPaths: readonly string[];
   readonly selectedItems: readonly WorkspaceItem[];
   readonly operationBusy: boolean;
+  readonly busyItemKeys: ReadonlySet<string>;
   readonly query: string;
   readonly visibleItems: readonly WorkspaceItem[];
   readonly viewMode: ViewMode;
@@ -783,7 +784,9 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
                   <input
                     aria-label={`${item.enabled ? "\u505c\u7528" : "\u542f\u7528"} ${item.name}`}
                     checked={item.enabled}
-                    disabled={props.readOnly || props.operationBusy}
+                    disabled={
+                      props.readOnly || props.busyItemKeys.has(itemKey) || props.operationBusy
+                    }
                     onChange={(event) => props.onSetItemEnabled(item, event.currentTarget.checked)}
                     onClick={(event) => event.stopPropagation()}
                     onDoubleClick={(event) => event.stopPropagation()}

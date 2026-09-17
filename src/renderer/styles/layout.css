@@ -359,7 +359,7 @@
 
 .category-style-options {
   display: grid;
-  grid-template-columns: repeat(4, 36px) 1fr;
+  grid-template-columns: repeat(5, 36px) 1fr;
   gap: 0;
   padding: 0;
   border: 0;

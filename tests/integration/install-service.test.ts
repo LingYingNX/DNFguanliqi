@@ -6,6 +6,7 @@ import { executeFileTransaction } from "../../src/core/filesystem/file-transacti
 import { createVirtualGroupService } from "../../src/core/groups/group-service";
 import { createInstallService } from "../../src/core/install/install-service";
 import { parseGameRoot, resolveAppPaths } from "../../src/main/app-paths";
+import { buildNpkBytes } from "./npk-fixture";
 
 const temporaryDirectories: string[] = [];
 
@@ -232,6 +233,76 @@ describe("install service", () => {
       ok: false,
       error: { code: "SOURCE_EMPTY", relativePath: created.value.id },
     });
+  });
+
+  it("routes image and sound patches into their respective subdirectories", async () => {
+    // Given: an image NPK and a sound NPK in the library, with both subdirectories present.
+    const { paths, gameRoot } = await createInstallFixture();
+    const imageDir = join(gameRoot, "ImagePacks2");
+    const soundDir = join(gameRoot, "SoundPacks");
+    await Promise.all([mkdir(imageDir), mkdir(soundDir)]);
+    await writeFile(
+      join(paths.libraryRoot, "sprite.npk"),
+      buildNpkBytes(["sprite/character/xxx.img"]),
+    );
+    await writeFile(join(paths.libraryRoot, "bgm.npk"), buildNpkBytes(["sounds/bgm/xxx.ogg"]));
+    const service = createInstallService({ ...paths, gameRoot });
+
+    // When: both patches are enabled in one batch.
+    const result = await service.enableMany([
+      { kind: "patch", relativePath: "sprite.npk" },
+      { kind: "patch", relativePath: "bgm.npk" },
+    ]);
+
+    // Then: each copy lands in its routed subdirectory with a matching record.
+    expect(result).toEqual({ ok: true, value: { installedCount: 2 } });
+    expect(await readFile(join(imageDir, "sprite.npk"), "utf8")).toBeTruthy();
+    expect(await readFile(join(soundDir, "bgm.npk"), "utf8")).toBeTruthy();
+    expect(await readdir(gameRoot)).toEqual(["ImagePacks2", "SoundPacks"]);
+    const state = JSON.parse(
+      await readFile(join(paths.dataRoot, "installation-state.json"), "utf8"),
+    );
+    expect(state.records.map((record: { targetPath: string }) => record.targetPath)).toEqual([
+      join(imageDir, "sprite.npk"),
+      join(soundDir, "bgm.npk"),
+    ]);
+  });
+
+  it("disables a routed sound patch inside SoundPacks and a legacy root record", async () => {
+    // Given: one sound patch installed through routing and one legacy root-level record.
+    const { paths, gameRoot } = await createInstallFixture();
+    const soundDir = join(gameRoot, "SoundPacks");
+    await mkdir(soundDir);
+    await writeFile(join(paths.libraryRoot, "bgm.npk"), buildNpkBytes(["sounds/bgm/xxx.ogg"]));
+    await writeFile(join(paths.libraryRoot, "legacy.npk"), buildNpkBytes(["sprite/a.img"]));
+    const service = createInstallService({ ...paths, gameRoot });
+    await service.enable({ kind: "patch", relativePath: "bgm.npk" });
+    await service.enable({ kind: "patch", relativePath: "legacy.npk" });
+
+    // When: both patches are disabled.
+    const result = await service.disableMany([
+      { kind: "patch", relativePath: "bgm.npk" },
+      { kind: "patch", relativePath: "legacy.npk" },
+    ]);
+
+    // Then: both routed and legacy targets are removed without boundary errors.
+    expect(result).toEqual({ ok: true, value: { removedCount: 2 } });
+    await expect(access(join(soundDir, "bgm.npk"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(access(join(gameRoot, "legacy.npk"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("falls back to the game root when the routed subdirectory is missing", async () => {
+    // Given: a sound NPK enabled while SoundPacks has not been created yet.
+    const { paths, gameRoot } = await createInstallFixture();
+    await writeFile(join(paths.libraryRoot, "bgm.npk"), buildNpkBytes(["sounds/bgm/xxx.ogg"]));
+    const service = createInstallService({ ...paths, gameRoot });
+
+    // When: the patch is enabled.
+    const result = await service.enable({ kind: "patch", relativePath: "bgm.npk" });
+
+    // Then: the copy lands directly in the game root instead of failing.
+    expect(result).toEqual({ ok: true, value: { installedCount: 1 } });
+    expect(await readFile(join(gameRoot, "bgm.npk"), "utf8")).toBeTruthy();
   });
 
   it("enables and disables one patch with matching state records", async () => {

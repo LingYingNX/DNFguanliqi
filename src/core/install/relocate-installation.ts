@@ -90,7 +90,11 @@ export async function prepareRelocateInstallations(
           return err({ code: "TARGET_MODIFIED", targetPath: record.targetPath });
         }
         const nextSourcePath = relocatedSourcePath(record, request);
-        const nextTargetPath = win32.join(context.gameRoot, win32.basename(nextSourcePath));
+        // 源文件内容不变，分类不变：保留原记录所在目录（根目录或 ImagePacks2/SoundPacks），只替换文件名。
+        const nextTargetPath = win32.join(
+          win32.dirname(record.targetPath),
+          win32.basename(nextSourcePath),
+        );
         const nextSourceIdentity = normalizedPathKey(nextSourcePath);
         const nextTargetIdentity = normalizedPathKey(nextTargetPath);
         if (nextSources.has(nextSourceIdentity) || nextTargets.has(nextTargetIdentity)) {

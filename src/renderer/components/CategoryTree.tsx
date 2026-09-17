@@ -54,6 +54,7 @@ export const folderStyleIcons: Record<CategoryFolderStyle, string> = {
   star: new URL("../assets/category-folder-icons/folder-star.svg", import.meta.url).href,
   outline: new URL("../assets/category-folder-icons/folder-outline.svg", import.meta.url).href,
   add: new URL("../assets/category-folder-icons/folder-add.svg", import.meta.url).href,
+  music: new URL("../assets/category-folder-icons/folder-music.svg", import.meta.url).href,
 };
 
 function CategoryFolderIcon({

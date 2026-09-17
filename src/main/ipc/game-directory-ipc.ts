@@ -33,6 +33,21 @@ export type GameDirectoryBinding = {
   readonly updateSettings: (next: AppSettings) => Promise<ApiResult<AppSettings>>;
 };
 
+/** 游戏根目录下必须存在的子目录：贴图与音效补丁的落盘位置。 */
+export const GAME_SUBDIRECTORIES = ["ImagePacks2", "SoundPacks"] as const;
+
+/** 校验游戏根目录是否包含全部必需子目录（真实 FS 探测，缺失任一即不通过）。 */
+export async function assertGameRootHasSubdirectories(gameRoot: string): Promise<boolean> {
+  const checks = await Promise.all(
+    GAME_SUBDIRECTORIES.map((name) =>
+      stat(win32.join(gameRoot, name))
+        .then((metadata) => metadata.isDirectory())
+        .catch(() => false),
+    ),
+  );
+  return checks.every((exists) => exists);
+}
+
 export async function registerGameDirectoryIpc(
   window: BrowserWindow,
   paths: AppPaths,
@@ -60,6 +75,14 @@ export async function registerGameDirectoryIpc(
       return null;
     }
   };
+
+  /** 保存前校验 ImagePacks2 / SoundPacks 存在，任一缺失即视为未选到游戏根目录。 */
+  const assertGameSubdirectoriesExist = async (
+    gameRoot: string,
+  ): Promise<ApiResult<{ readonly gameDirectory: string | null }> | null> =>
+    (await assertGameRootHasSubdirectories(gameRoot))
+      ? null
+      : { ok: false, error: apiError("GAME_ROOT_MISSING") };
 
   const persistDirectory = (
     nextDirectory: string,
@@ -93,6 +116,8 @@ export async function registerGameDirectoryIpc(
     if (!parsed.success) return { ok: false, error: apiError("INVALID_INPUT") };
     const nextDirectory = await resolveDirectory(parsed.data.gameDirectory);
     if (nextDirectory === null) return { ok: false, error: apiError("INVALID_INPUT") };
+    const missingSubdirectory = await assertGameSubdirectoriesExist(nextDirectory);
+    if (missingSubdirectory !== null) return missingSubdirectory;
     return persistDirectory(nextDirectory);
   });
 
@@ -105,6 +130,8 @@ export async function registerGameDirectoryIpc(
     if (selected === undefined) return { ok: false, error: apiError("INVALID_INPUT") };
     const nextDirectory = await resolveDirectory(selected);
     if (nextDirectory === null) return { ok: false, error: apiError("INVALID_INPUT") };
+    const missingSubdirectory = await assertGameSubdirectoriesExist(nextDirectory);
+    if (missingSubdirectory !== null) return missingSubdirectory;
     return persistDirectory(nextDirectory);
   });
 

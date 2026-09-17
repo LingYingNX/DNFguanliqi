@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { DnfApi } from "../../shared/ipc-contracts";
 import type { CategorySnapshot, ChildCategory } from "../../shared/library-dto";
 import { pathKey } from "../../shared/path-key";
 import type { NavigationSelection, ViewMode } from "../workspace/model";
+import { workspaceItemKey } from "../workspace/model";
 import { useAppearance } from "../workspace/useAppearance";
 import { useAppUpdate } from "../workspace/useAppUpdate";
 import { useGameDirectory } from "../workspace/useGameDirectory";
@@ -89,12 +90,34 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
   const [categoryDeletePath, setCategoryDeletePath] = useState("");
   const [presetDialog, setPresetDialog] = useState<PresetDialog>(null);
   const [operationBusy, setOperationBusy] = useState(false);
+  const [busyItemKeys, setBusyItemKeys] = useState<ReadonlySet<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const notice = gameDirectory.notice ?? workspace.notice;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const appearance = useAppearance(client, workspace.showNotice);
   const recovery = useRecoveryState(client);
+  const [noticeLeaving, setNoticeLeaving] = useState(false);
+
+  const dismissNotice = useCallback((): void => {
+    setNoticeLeaving(true);
+    gameDirectory.showNotice(null);
+    workspace.showNotice(null);
+    // 等 CSS 淡出过渡播完再卸载元素。
+    window.setTimeout(() => setNoticeLeaving(false), 320);
+  }, [gameDirectory.showNotice, workspace.showNotice]);
+
+  // 提示条 5 秒后带淡出动画消失；notice 变化（含手动关闭）都会重置计时。
+  useEffect(() => {
+    if (notice === null) {
+      setNoticeLeaving(false);
+      return;
+    }
+    const leavingTimer = window.setTimeout(dismissNotice, 5000);
+    return () => {
+      window.clearTimeout(leavingTimer);
+    };
+  }, [notice, dismissNotice]);
 
   useEffect(() => {
     if (navigation.kind === "category" && navigation.relativePath !== workspace.categoryPath) {
@@ -187,6 +210,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
         selectedPaths={selection.selectedPaths}
         selectedItems={selection.selectedItems}
         operationBusy={operationBusy}
+        busyItemKeys={busyItemKeys}
         query={workspace.query}
         onAddToPreset={() =>
           setPresetDialog({
@@ -219,8 +243,16 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
           return operations.renameItem(item, newName).finally(() => setOperationBusy(false));
         }}
         onSetItemEnabled={(item, enabled) => {
-          setOperationBusy(true);
-          void operations.setEnabledFor([item], enabled).finally(() => setOperationBusy(false));
+          // 单个开关的启用/停用只标记该卡片为忙碌，避免全局 busy 让所有开关闪烁。
+          const itemKey = workspaceItemKey(item);
+          setBusyItemKeys((current) => new Set([...current, itemKey]));
+          void operations.setEnabledFor([item], enabled).finally(() => {
+            setBusyItemKeys((current) => {
+              const next = new Set(current);
+              next.delete(itemKey);
+              return next;
+            });
+          });
         }}
         readOnly={recovery.readOnly}
         scope={workspace.scope}
@@ -307,7 +339,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       />
       {settingsOpen ? (
         <SettingsDialog
-          currentVersion={client?.appInfo.version ?? "1.2.3"}
+          currentVersion={client?.appInfo.version ?? "1.2.4"}
           gameDirectory={gameDirectory.gameDirectory}
           gameDirectoryBusy={
             gameDirectory.loading || gameDirectory.selecting || gameDirectory.saving
@@ -339,7 +371,9 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       ) : null}
       {notice === null ? null : (
         <div className="toast-viewport">
-          <Toast tone={notice.tone}>{notice.message}</Toast>
+          <Toast data-leaving={noticeLeaving} onClose={dismissNotice} tone={notice.tone}>
+            {notice.message}
+          </Toast>
         </div>
       )}
     </div>

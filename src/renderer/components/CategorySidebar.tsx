@@ -69,6 +69,7 @@ const folderStyleOptions = [
   { label: "收藏文件夹", style: "star" },
   { label: "线框文件夹", style: "outline" },
   { label: "新增文件夹", style: "add" },
+  { label: "音乐文件夹", style: "music" },
 ] as const satisfies readonly { readonly label: string; readonly style: CategoryFolderStyle }[];
 
 function SystemRow({

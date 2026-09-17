@@ -102,7 +102,8 @@ describe("Halo workspace", () => {
       expect(scanCount).toBeGreaterThan(1);
     });
     expect(await screen.findByText("imported.npk")).toBeInTheDocument();
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    // 标题栏的"发现新版本"启动提示也是 role="status"，操作提示断言只看工作区内部。
+    expect(within(screen.getByRole("main")).queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("does not relabel stale items when a category scan fails", async () => {

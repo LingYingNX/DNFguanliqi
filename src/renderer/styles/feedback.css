@@ -2,14 +2,16 @@
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 20;
-  width: min(360px, calc(100vw - 36px));
+  /* 高于所有对话框 backdrop（z-index 100），保证对话框打开时提示条仍可点击。 */
+  z-index: 120;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 36px));
 }
 
 .toast {
   min-height: 44px;
-  gap: 10px;
-  padding: 11px 13px;
+  gap: 8px;
+  padding: 11px 10px 11px 13px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   color: var(--color-text-primary);
@@ -17,6 +19,44 @@
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.46);
   font-size: 13px;
   line-height: 1.4;
+  animation: toast-in 160ms ease-out;
+  transition:
+    opacity 320ms ease,
+    transform 320ms ease;
+}
+
+.toast[data-leaving="true"] {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.toast-close {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.toast-close:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-border-strong) 36%, transparent);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .toast[data-tone="success"] svg {
@@ -33,6 +73,11 @@
 
 .toast[data-tone="error"] svg {
   color: var(--color-error);
+}
+
+/* 圆形叉图标与文字之间的距离不再被拉开：关闭按钮紧随文本。 */
+.toast > span {
+  margin-right: 2px;
 }
 
 .spin {

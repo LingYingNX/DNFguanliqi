@@ -17,7 +17,8 @@
   height: var(--window-titlebar-height);
   align-items: center;
   color: var(--color-text-primary);
-  background: var(--color-canvas);
+  /* 半透明背景让壁纸从标题栏透出。 */
+  background: rgba(10, 11, 15, 0.58);
   border-bottom: var(--section-divider-width) solid var(--color-border-strong);
 }
 

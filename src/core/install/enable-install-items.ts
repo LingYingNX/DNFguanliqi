@@ -16,6 +16,7 @@ import {
   restoreInstallationState,
   writeInstallationState,
 } from "./installation-state";
+import { classifyNpk, type NpkPatchKind } from "./npk-type";
 
 type EnableCandidate = {
   readonly source: InstallSource;
@@ -82,6 +83,15 @@ async function copyFileExclusive(
   await copyFile(sourcePath, targetPath, COPYFILE_EXCL);
 }
 
+/**
+ * 路由目标目录：按 NPK 内容分类选 ImagePacks2 / SoundPacks；
+ * 子目录缺失（外部被删或旧测试环境）时回落 gameRoot 直属，不阻塞安装。
+ */
+async function resolveTargetDir(context: InstallBatchContext, kind: NpkPatchKind): Promise<string> {
+  const routed = kind === "sound" ? context.soundTargetDir : context.imageTargetDir;
+  return (await pathExists(routed)) ? routed : context.gameRoot;
+}
+
 async function buildCandidates(
   context: InstallBatchContext,
   items: readonly InstallItem[],
@@ -105,7 +115,9 @@ async function buildCandidates(
     if (records.some((record) => record.sourceRelativePath === source.sourceRelativePath)) {
       return err({ code: "ALREADY_ENABLED", relativePath: source.sourceRelativePath });
     }
-    const targetPath = win32.join(context.gameRoot, source.name);
+    const kind = await classifyNpk(source.sourcePath);
+    const targetDir = await resolveTargetDir(context, kind);
+    const targetPath = win32.join(targetDir, source.name);
     const targetName = win32.basename(targetPath).toLocaleLowerCase();
     if (targetNames.has(targetName) || (await pathExists(targetPath))) {
       return err({ code: "TARGET_CONFLICT", targetPath });
