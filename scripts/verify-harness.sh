@@ -426,10 +426,28 @@ check_hooks_autosetup() {
         fi
     fi
 
+    # Check npm prepare script (mechanism 6 in enforcement-mechanisms.md).
+    # A repo whose prepare script sets core.hooksPath (directly or via husky)
+    # has automatic hook activation on install; ignoring it produced a false
+    # "no auto-setup" warning on a repo where the hook provably worked.
+    if [[ "$found" == false && -f "package.json" ]]; then
+        local prepare
+        prepare=$(grep -oE '"prepare"[[:space:]]*:[[:space:]]*"[^"]+"' "package.json" 2>/dev/null | head -1 | sed 's/.*:\s*"//; s/"$//' || true)
+        if [[ -n "$prepare" ]]; then
+            if [[ "$prepare" == *hooksPath* ]]; then
+                found=true
+                via="package.json prepare script (hooksPath)"
+            elif [[ "$prepare" == *husky* ]]; then
+                found=true
+                via="package.json prepare script (husky)"
+            fi
+        fi
+    fi
+
     if [[ "$found" == true ]]; then
         pass 3 "Git hooks auto-setup via ${via}"
     else
-        warn 3 "No git hooks auto-setup detected (.envrc hooksPath, .husky/, or composer.json post-install-cmd)"
+        warn 3 "No git hooks auto-setup detected (.envrc hooksPath, .husky/, composer.json post-install-cmd, or package.json prepare)"
     fi
 }
 
@@ -500,45 +518,48 @@ check_drift() {
         return
     fi
 
-    # Check if build/CI files changed in last commit
+    # Check if build/CI files changed in last commit.
+    # Directories with build/CI changes are collected, not just the last one:
+    # a commit may touch both a workflow and a harness script, and coverage
+    # must be evaluated per directory.
     local build_files_changed=false
     local agents_changed=false
-    local changed_dir=""
+    local -A changed_dirs=()
 
     while IFS= read -r changed_file; do
         case "$changed_file" in
+            AGENTS.md)
+                agents_changed=true
+                ;;
             Makefile|composer.json|package.json|.github/workflows/*|.gitlab-ci.yml|.forgejo/workflows/*|.gitea/workflows/*)
                 build_files_changed=true
-                # Remember the deepest directory touched, so a scoped AGENTS.md
-                # beside it also counts as "documentation updated". Checking only
-                # the root AGENTS.md raised "No drift detected" when a workflow
-                # was added and .github/workflows/AGENTS.md was left stale.
-                changed_dir="${changed_file%/*}"
-                [[ "$changed_dir" == "$changed_file" ]] && changed_dir=""
+                changed_dirs["${changed_file%/*}"]=1
                 ;;
             scripts/*)
                 # Harness scripts are documented in AGENTS.md (verification
                 # commands, hook wiring). Skipping them let a script change ship
                 # with the docs still describing the old behaviour.
                 build_files_changed=true
-                changed_dir="scripts"
-                ;;
-            AGENTS.md)
-                agents_changed=true
+                changed_dirs["scripts"]=1
                 ;;
         esac
     done < <(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
 
     # A scoped AGENTS.md in the touched directory (or an ancestor of it) also
-    # counts: scoped files are what carry directory-specific CI rules.
-    if [[ "$agents_changed" == false && -n "$changed_dir" ]]; then
+    # counts: scoped files are what carry directory-specific CI rules. Each
+    # changed directory is checked independently — an update in one scope does
+    # not cover build changes in another.
+    if [[ "$agents_changed" == false && ${#changed_dirs[@]} -gt 0 ]]; then
+        local scoped scoped_dir dir
         while IFS= read -r scoped; do
             [[ -z "$scoped" ]] && continue
             scoped_dir="${scoped%/AGENTS.md}"
-            if [[ "$changed_dir" == "$scoped_dir"* ]]; then
-                agents_changed=true
-                break
-            fi
+            for dir in "${!changed_dirs[@]}"; do
+                if [[ "$dir" == "$scoped_dir"* ]]; then
+                    agents_changed=true
+                    break 2
+                fi
+            done
         done < <(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '(^|/)AGENTS\.md$' || true)
     fi
 
