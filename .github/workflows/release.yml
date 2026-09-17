@@ -45,3 +45,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm run release
+
+      - name: Verify latest release pointer
+        shell: pwsh
+        run: |
+          $expected = "${{ github.ref_name }}"
+          $retries = 6
+          for ($i = 1; $i -le $retries; $i++) {
+            Start-Sleep -Seconds 5
+            $latest = gh api repos/${{ github.repository }}/releases/latest --jq .tag_name 2>$null
+            if ($latest -eq $expected) {
+              Write-Output "Latest release points to $latest"
+              exit 0
+            }
+            Write-Output "Attempt ${i}: latest is '$latest', expected '$expected'"
+          }
+          throw "releases/latest points to '$latest' instead of '$expected'. electron-updater clients will not see the new version. Fix with: gh api -X PATCH repos/${{ github.repository }}/releases/<release-id> -F make_latest=true"

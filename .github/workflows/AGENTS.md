@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-09-16 -->
+<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-09-17 -->
 
 # AGENTS.md — .github/workflows
 
@@ -10,7 +10,7 @@
 
 | 文件 | 作用 |
 |------|------|
-| `release.yml` | windows-latest 上校验 tag 与版本一致，安装 Electron 二进制后 `pnpm run release` |
+| `release.yml` | windows-latest 上校验 tag 与版本一致，安装 Electron 二进制后 `pnpm run release`，发布后校验 `releases/latest` 指向新标签 |
 | `harness-verify.yml` | ubuntu-latest 上运行 `bash scripts/verify-harness.sh` |
 | `no-duplicate-helpers.yml` | ubuntu-latest 上运行 `node scripts/check-path-helpers.mjs`，与 `.githooks/pre-commit` 同源 |
 
@@ -19,6 +19,7 @@
 - 发布必须保留 `pnpm exec install-electron` 步骤；`pnpm install --frozen-lockfile` 不保证存在 `node_modules/electron/dist`。
 - 发布前保证 `package.json` version、`APP_VERSION`、Git 标签 `vX.Y.Z` 四者一致。
 - 同一版本重打包不会触发已有安装的自动更新；修复更新必须递增版本号。
+- 发布后必须校验 `releases/latest` 指向新标签：`electron-updater` 稳定通道只查该接口，指针未迁移时客户端检测不到更新。`release.yml` 的「Verify latest release pointer」步骤负责此项（重试 30 秒后仍不一致即失败并给出修复命令）；改动发布流程时不得删除该步骤。
 
 ## Build & tests
 
