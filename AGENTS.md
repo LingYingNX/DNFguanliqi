@@ -104,7 +104,7 @@ pnpm doctor                      # react-doctor 诊断
 - 发布（含草稿转正式）后必须确认 GitHub `releases/latest` 接口指向新标签——`electron-updater` 稳定通道只查这个接口，Latest 指针留在旧版本时客户端检测不到更新且无报错。用 API `PATCH /releases/<id>` 发布时必须显式传 `-F make_latest=true`（缺省不自动迁移；与 `draft=false` 合并在同一次 PATCH 里时可能不生效，指针未迁移就单独再发一次 `-F make_latest=true`）；electron-builder 上传 `.exe` 与 `.blockmap` 可能并发创建两个草稿，需删除残缺草稿再发布。`release.yml` 的「Verify latest release pointer」步骤已机器校验此项，手动发布时用 `gh api repos/<owner>/<repo>/releases/latest --jq .tag_name` 核对。
 - 自动更新只能用已安装的 NSIS 版本验证；源码目录的 `启动DNF补丁管理器.bat` 属于开发模式，不代表真实更新链路可用。更新日志默认来自 `src/shared/contracts.ts`，检测到新版本后才替换为 GitHub Release 说明。
 - `pnpm dist:installer` 用于验证 NSIS 安装器（包括可选安装路径）；`pnpm verify:portable` 与 `pnpm verify:packaged` 当前只覆盖 portable 产物，不能据此声称 NSIS 安装路径已验证。
-- 安装目录内的 `patch-categories`（补丁库）与 `data`（配置）是用户数据，NSIS 更新与卸载必须保留。由 `build/installer-custom.nsh` 实现（`customRemoveFiles` 只删应用文件；`customInit`/`customInstall` 在 ≤1.2.4 旧卸载器清空目录前抢搬用户数据、装完放回），经 `package.json` 的 `build.nsis.include` 挂载。改动打包配置或该脚本后，必须运行 `pnpm verify:nsis` 模拟安装→更新→卸载全链路验证用户数据保留。
+- 安装目录内的 `patch-categories`（补丁库）与 `data`（配置）是用户数据，NSIS 更新与卸载必须保留。由 `build/installer-custom.nsh` 实现（`customRemoveFiles` 按白名单只删应用文件；`customInit` 检测 `resources\keep-user-data.flag` 工牌——有标记说明旧卸载器已带白名单、跳过抢搬，无标记（≤1.2.4）才把用户数据抢搬到 %TEMP；`customInstall` 放回数据并写入工牌），经 `package.json` 的 `build.nsis.include` 挂载。改动打包配置或该脚本后，必须运行 `pnpm verify:nsis` 模拟安装→更新→卸载全链路验证用户数据保留。
 
 ### 工作范围
 
