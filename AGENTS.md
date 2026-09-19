@@ -87,7 +87,8 @@ pnpm doctor                      # react-doctor 诊断
 ### 硬性规则
 
 - 不在指定目标之外递归删除或移动；先解析绝对路径。
-- 不 `git push`、不 `git reset --hard`、不未经要求改写远程历史。
+- **`git push` 必须获得用户当次明确批准**：批准"构建 / 发布 / 替换 Release 资产"不等于批准推送；推送其他会话或他人产生的提交，更要单独说明并获准。`git push --force` 与改写远程历史任何情况下都需要单独批准。
+- 不 `git reset --hard`、不未经要求改写远程历史。
 - 不改 lockfile、不未经要求升级大版本依赖。
 - 不弱化、跳过或删除测试来让它通过。
 - 未实际运行通过并展示输出前，不得声称检查通过。
@@ -96,6 +97,7 @@ pnpm doctor                      # react-doctor 诊断
 ### Git 与发布
 
 - 默认在 `master` 分支开发和发布；临时分支只在确有隔离需求时创建，清理分支前先列出并得到明确请求。
+- 推送边界（与硬性规则同源）：`git push` 前必须本轮用户明确说过"推送 / push"；说"构建""发布""更新 Release 资产"时只做本地构建与资产替换，完成后报告并等用户决定是否推送。多会话并行时，其他会话的提交一律不代推。
 - 源码仓库与发布物分离：提交 `src/`、配置、测试和必要脚本；不提交 `node_modules/`、`out/`、`dist/`、`data/`、用户补丁库、日志或本地 `.learnings/`。安装包、`latest.yml`、`.blockmap` 只上传到 GitHub Release。
 - 只上传源码时不要顺手改写 `README.md` 或其它说明文件；发布附件不是源码文件。
 - 发布前保持 `package.json` 的 `version`、`src/shared/contracts.ts` 的 `APP_VERSION`、Git 标签 `vX.Y.Z` 和 Release 中的 `latest.yml` 一致。同一版本的重打包不会触发现有安装的自动更新，修复更新必须递增版本号。
