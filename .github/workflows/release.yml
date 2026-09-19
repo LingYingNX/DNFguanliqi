@@ -47,17 +47,25 @@ jobs:
         run: pnpm run release
 
       - name: Verify latest release pointer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
         run: |
           $expected = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
+          $selfDraft = gh api "repos/$repo/releases/tags/$expected" --jq .draft 2>$null
+          if ($selfDraft -eq "true") {
+            Write-Output "::warning::electron-builder left release $expected as a DRAFT. Publish it manually with release notes and -F make_latest=true; electron-updater clients cannot see drafts."
+            exit 0
+          }
           $retries = 6
           for ($i = 1; $i -le $retries; $i++) {
             Start-Sleep -Seconds 5
-            $latest = gh api repos/${{ github.repository }}/releases/latest --jq .tag_name 2>$null
+            $latest = gh api "repos/$repo/releases/latest" --jq .tag_name 2>$null
             if ($latest -eq $expected) {
               Write-Output "Latest release points to $latest"
               exit 0
             }
             Write-Output "Attempt ${i}: latest is '$latest', expected '$expected'"
           }
-          throw "releases/latest points to '$latest' instead of '$expected'. electron-updater clients will not see the new version. Fix with: gh api -X PATCH repos/${{ github.repository }}/releases/<release-id> -F make_latest=true"
+          throw "releases/latest points to '$latest' instead of '$expected'. electron-updater clients will not see the new version. Fix with: gh api -X PATCH repos/$repo/releases/<release-id> -F make_latest=true"

@@ -19,7 +19,7 @@
 - 发布必须保留 `pnpm exec install-electron` 步骤；`pnpm install --frozen-lockfile` 不保证存在 `node_modules/electron/dist`。
 - 发布前保证 `package.json` version、`APP_VERSION`、Git 标签 `vX.Y.Z` 四者一致。
 - 同一版本重打包不会触发已有安装的自动更新；修复更新必须递增版本号。
-- 发布后必须校验 `releases/latest` 指向新标签：`electron-updater` 稳定通道只查该接口，指针未迁移时客户端检测不到更新。`release.yml` 的「Verify latest release pointer」步骤负责此项（重试 30 秒后仍不一致即失败并给出修复命令）；改动发布流程时不得删除该步骤。
+- 发布后必须校验 `releases/latest` 指向新标签：`electron-updater` 稳定通道只查该接口，指针未迁移时客户端检测不到更新。「Verify latest release pointer」步骤负责此项——electron-builder 留下草稿时输出 warning 并放行（草稿需人工补更新说明后发布），已发布但指针未迁移（重试 30 秒）则失败并给出修复命令。该步骤必须带 `GH_TOKEN` 环境变量，否则 runner 上 `gh` 未认证、查询返回空。改动发布流程时不得删除该步骤。
 
 ## Build & tests
 
