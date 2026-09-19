@@ -1,6 +1,6 @@
 {
   "name": "dnf-patch-manager-rewrite",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "DNF patch manager desktop application rewrite",
   "type": "module",
   "main": "out/main/main.js",
@@ -20,6 +20,7 @@
     "dist:installer": "pnpm build && electron-builder --win nsis --x64 --publish never",
     "release": "pnpm build && electron-builder --win nsis --x64 --publish always",
     "verify:portable": "node scripts/verify-portable.mjs",
+    "verify:nsis": "bash scripts/verify-nsis-preservation.sh",
     "verify:packaged": "node scripts/verify-packaged.mjs",
     "verify:no-dup-helpers": "node scripts/check-path-helpers.mjs",
     "doctor": "npx react-doctor@latest"
@@ -53,6 +54,7 @@
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
       "deleteAppDataOnUninstall": false,
+      "include": "build/installer-custom.nsh",
       "artifactName": "dnf-patch-manager-${version}-setup.${ext}"
     },
     "win": {
