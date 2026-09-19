@@ -26,6 +26,7 @@ function resolveUpdateNotice(
 export function WindowTitleBar({ client, update }: Props): React.JSX.Element {
   const [isMaximized, setIsMaximized] = useState(false);
   const [updateNoticeVisible, setUpdateNoticeVisible] = useState(false);
+  const [dismissedSequence, setDismissedSequence] = useState<number | null>(null);
   const updateNotice = resolveUpdateNotice(update, client?.appInfo.version ?? "");
 
   useEffect(() => {
@@ -41,13 +42,18 @@ export function WindowTitleBar({ client, update }: Props): React.JSX.Element {
 
   const noticeTitle = updateNotice?.title ?? null;
   useEffect(() => {
-    const shouldShow = update.noticeSequence > 0 && noticeTitle !== null;
+    const shouldShow =
+      update.noticeSequence > 0 &&
+      noticeTitle !== null &&
+      dismissedSequence !== update.noticeSequence;
     setUpdateNoticeVisible(shouldShow);
-    if (!shouldShow) return;
+    // “发现新版本”常驻直到手动关闭——启动时的自动检查可能比窗口晚几秒才完成，
+    // 5 秒自动消失会让用户错过提示；“已是最新版”仅作确认，5 秒后自动淡出。
+    if (!shouldShow || update.noticeKind !== "current") return;
 
     const timeoutId = window.setTimeout(() => setUpdateNoticeVisible(false), 5000);
     return () => window.clearTimeout(timeoutId);
-  }, [update.noticeSequence, noticeTitle]);
+  }, [dismissedSequence, noticeTitle, update.noticeKind, update.noticeSequence]);
 
   const minimize = (): void => {
     if (client !== undefined) void client.windowControls.minimize();
@@ -77,6 +83,7 @@ export function WindowTitleBar({ client, update }: Props): React.JSX.Element {
           aria-label={`${updateNotice.title} ${updateNotice.detail}`}
           aria-live="polite"
           className="window-titlebar-update-notice"
+          data-kind={update.noticeKind}
           role="status"
         >
           <span className="window-titlebar-update-notice-icon">
@@ -86,6 +93,15 @@ export function WindowTitleBar({ client, update }: Props): React.JSX.Element {
             <strong>{updateNotice.title}</strong>
             <span>{updateNotice.detail}</span>
           </span>
+          <button
+            aria-label="关闭更新提示"
+            className="window-titlebar-update-notice-close"
+            title="关闭提示"
+            type="button"
+            onClick={() => setDismissedSequence(update.noticeSequence)}
+          >
+            <X aria-hidden="true" size={13} />
+          </button>
         </div>
       ) : null}
       <button

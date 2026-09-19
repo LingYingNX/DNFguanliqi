@@ -17,7 +17,7 @@ export type AppUpdate = {
   readonly message: string | null;
   readonly noticeKind: "available" | "current" | null;
   readonly noticeSequence: number;
-  readonly check: (manual?: boolean) => Promise<void>;
+  readonly check: (manual?: boolean) => Promise<boolean>;
   readonly download: () => Promise<void>;
   readonly install: () => Promise<void>;
 };
@@ -33,6 +33,7 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
   const [noticeKind, setNoticeKind] = useState<AppUpdate["noticeKind"]>(null);
   const [noticeSequence, setNoticeSequence] = useState(0);
   const checkedClient = useRef<DnfApi | undefined>(undefined);
+  const everSucceeded = useRef(false);
 
   useEffect(() => {
     if (client === undefined) return;
@@ -72,8 +73,8 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
   }, [client]);
 
   const check = useCallback(
-    async (manual = false): Promise<void> => {
-      if (client === undefined) return;
+    async (manual = false): Promise<boolean> => {
+      if (client === undefined) return false;
       setPhase("checking");
       setMessage(null);
       try {
@@ -81,8 +82,9 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
         if (!result.ok) {
           setPhase("failed");
           setMessage(result.error.message);
-          return;
+          return false;
         }
+        everSucceeded.current = true;
         setLatestVersion(result.value.latestVersion);
         if (result.value.updateAvailable || result.value.releaseNotes.length > 0) {
           setReleaseNotes(result.value.releaseNotes);
@@ -92,9 +94,11 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
           setNoticeSequence((value) => value + 1);
         }
         setPhase(result.value.updateAvailable ? "available" : "current");
+        return true;
       } catch {
         setPhase("failed");
         setMessage("检查更新失败，请检查网络后重试");
+        return false;
       }
     },
     [client],
@@ -129,7 +133,23 @@ export function useAppUpdate(client: DnfApi | undefined): AppUpdate {
   useEffect(() => {
     if (client === undefined || checkedClient.current === client) return;
     checkedClient.current = client;
-    void check();
+    // 启动自动检查失败（网络未就绪、GitHub 限流等）会让用户整个会话收不到更新
+    // 提示，因此失败后自动重试，最多 2 次；任何一次成功（含手动）即终止。
+    let attemptsLeft = 2;
+    let timerId: number | undefined;
+    let cancelled = false;
+    const run = async (): Promise<void> => {
+      if (cancelled) return;
+      const succeeded = await check();
+      if (succeeded || cancelled || everSucceeded.current || attemptsLeft <= 0) return;
+      attemptsLeft -= 1;
+      timerId = window.setTimeout(() => void run(), 30_000);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+      if (timerId !== undefined) window.clearTimeout(timerId);
+    };
   }, [check, client]);
 
   return {

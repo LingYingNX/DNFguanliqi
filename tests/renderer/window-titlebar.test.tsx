@@ -96,7 +96,7 @@ describe("window title bar", () => {
 });
 
 const IDLE_UPDATE: AppUpdate = {
-  check: async () => {},
+  check: async () => true,
   download: async () => {},
   install: async () => {},
   latestVersion: null,

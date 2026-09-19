@@ -66,7 +66,7 @@
   top: 6px;
   left: 50%;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   min-width: 260px;
   max-width: min(400px, calc(100vw - 240px));
   height: 40px;
@@ -80,12 +80,34 @@
   opacity: 1;
   pointer-events: none;
   transform: translateX(-50%);
-  animation: window-titlebar-update-notice-fade-out 500ms var(--easing-standard) 4500ms forwards;
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(16px) saturate(135%);
   -webkit-backdrop-filter: blur(16px) saturate(135%);
+}
+
+/* 只有“已是最新版”自动淡出；“发现新版本”常驻，由用户手动关闭。 */
+.window-titlebar-update-notice[data-kind="current"] {
+  animation: window-titlebar-update-notice-fade-out 500ms var(--easing-standard) 4500ms forwards;
+}
+
+.window-titlebar-update-notice-close {
+  pointer-events: auto;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.window-titlebar-update-notice-close:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-text-primary) 12%, transparent);
 }
 
 @keyframes window-titlebar-update-notice-fade-out {

@@ -153,7 +153,7 @@ describe("appearance settings", () => {
     expect(within(settingsDialog).getByRole("button", { name: "立即更新" })).toBeDisabled();
   });
 
-  it("auto-hides the update notice after five seconds", async () => {
+  it("keeps the update-available notice until it is dismissed", async () => {
     render(<App api={createFakeApi(WORKSPACE_SNAPSHOT)} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "设置" }));
@@ -167,8 +167,81 @@ describe("appearance settings", () => {
       });
       expect(screen.getByRole("status", { name: /发现新版本.*v9\.9\.9/u })).toBeInTheDocument();
 
-      act(() => vi.advanceTimersByTime(5000));
+      // 发现新版本不能自动消失：启动检查可能比窗口晚出现，自动淡出会让用户错过。
+      act(() => vi.advanceTimersByTime(8000));
+      expect(screen.getByRole("status", { name: /发现新版本.*v9\.9\.9/u })).toBeInTheDocument();
+
+      act(() => {
+        fireEvent.click(screen.getByRole("button", { name: "关闭更新提示" }));
+      });
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("auto-hides the up-to-date notice after five seconds", async () => {
+    const api = createFakeApi(WORKSPACE_SNAPSHOT);
+    const check = async () => ({
+      ok: true as const,
+      value: {
+        currentVersion: "1.1.0",
+        latestVersion: "1.1.0",
+        updateAvailable: false,
+        releaseNotes: [],
+      },
+    });
+    render(<App api={{ ...api, update: { ...api.update, check } }} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "设置" }));
+    fireEvent.click(screen.getByRole("tab", { name: "关于软件" }));
+    const settingsDialog = screen.getByRole("dialog", { name: "设置" });
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(within(settingsDialog).getByRole("button", { name: "检查更新" }));
+      });
+      expect(screen.getByRole("status", { name: /当前已是最新版/u })).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(5500));
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries the automatic startup check when it fails", async () => {
+    const api = createFakeApi(WORKSPACE_SNAPSHOT);
+    let attempts = 0;
+    const failingCheck = async () => {
+      attempts += 1;
+      return {
+        ok: false as const,
+        error: { code: "UPDATE_CHECK_FAILED", message: "检查更新失败" },
+      };
+    };
+
+    vi.useFakeTimers();
+    try {
+      render(<App api={{ ...api, update: { ...api.update, check: failingCheck } }} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(attempts).toBe(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(attempts).toBe(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(attempts).toBe(3);
+      // 两次重试都失败后不再无限重试。
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120_000);
+      });
+      expect(attempts).toBe(3);
     } finally {
       vi.useRealTimers();
     }
