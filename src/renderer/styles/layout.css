@@ -92,16 +92,19 @@
   gap: 9px;
   padding: 0 10px;
   overflow: hidden;
-  border: 1px solid transparent;
+  /* 用 inset box-shadow 而非 border 画线框：Blink 会把 border-width 向下取整到
+     整数设备像素，1.6px 在 DPR=1 的屏幕上会退化成 1px。始终保留环的占位，
+     避免悬停/选中时行内布局抖动。 */
+  border: 0;
   border-radius: var(--radius-control);
   color: var(--color-text-secondary);
   background: transparent;
+  box-shadow: inset 0 0 0 var(--category-row-ring-width) transparent;
   cursor: pointer;
   text-align: left;
   transition:
-    border-color var(--motion-fast) var(--easing-standard),
-    background-color var(--motion-fast) var(--easing-standard),
-    box-shadow var(--motion-fast) var(--easing-standard);
+    box-shadow var(--motion-fast) var(--easing-standard),
+    background-color var(--motion-fast) var(--easing-standard);
 }
 
 .category-node-line {
@@ -190,13 +193,17 @@
   white-space: nowrap;
 }
 
+/* 悬停与选中都不用背景填充，只用线框区分：悬停 1px 浅蓝，选中 1.6 倍粗的紫色。
+   用 box-shadow 而非 border 是因为 Blink 会把 border-width 向下取整到整数设备像素。 */
 .category-row:hover {
+  box-shadow: inset 0 0 0 var(--category-row-ring-width) var(--category-row-hover-border);
   color: var(--color-text-primary);
-  background: color-mix(in srgb, #b7d6ff 42%, var(--color-elevated));
+  background: transparent;
 }
 
 .category-row.selected {
-  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 var(--category-row-selected-ring-width)
+    var(--category-row-selected-border);
   color: var(--color-text-primary);
   background: transparent;
 }
@@ -223,15 +230,16 @@
 }
 
 .category-row.drop-inside {
-  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 var(--category-row-selected-ring-width) var(--color-primary);
   background: var(--color-elevated);
 }
 
 .category-row.item-drop-target {
-  border-color: var(--color-primary);
   color: var(--color-text-primary);
   background: color-mix(in srgb, var(--color-elevated) 82%, var(--color-primary) 18%);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  box-shadow:
+    inset 0 0 0 var(--category-row-selected-ring-width) var(--color-primary),
+    0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .category-row.drop-after::after {
@@ -294,6 +302,9 @@
 }
 
 .category-row-editing {
+  box-shadow: inset 0 0 0 var(--category-row-selected-ring-width)
+    var(--category-row-selected-border);
+  color: var(--color-text-primary);
   cursor: default;
 }
 
@@ -305,6 +316,24 @@
   color: inherit;
   background: transparent;
   font: inherit;
+}
+
+/* 选中、键盘焦点与重命名共用同一圈线框：去掉全局 focus-visible 光晕，
+   否则线框外会再叠一层蓝边，重命名态更是只有光晕、没有线框。 */
+.category-tree .category-row:focus-visible {
+  box-shadow: inset 0 0 0 var(--category-row-selected-ring-width)
+    var(--category-row-selected-border);
+  outline: 0;
+}
+
+.category-row-editing input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+/* 用户手动拖选文本时用半透明底，避免默认整块蓝底盖住文字。 */
+.category-row-editing input::selection {
+  background: color-mix(in srgb, var(--category-row-selected-border) 45%, transparent);
 }
 
 .category-context-menu {
@@ -322,17 +351,17 @@
 .category-context-action {
   display: flex;
   width: 100%;
-  height: 31px;
+  height: 37px;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  gap: 10px;
+  padding: 0 10px;
   border: 0;
   border-radius: 5px;
   color: var(--color-text-primary);
   background: transparent;
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
 }
 
@@ -341,7 +370,7 @@
 }
 
 .category-context-delete {
-  flex: 0 0 31px;
+  flex: 0 0 37px;
   color: var(--color-danger);
 }
 

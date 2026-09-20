@@ -51,6 +51,10 @@
   --appearance-contrast: 100%;
   --category-text-color: #9aa0ae;
   --selected-tint: #5b6bff;
+  --category-row-hover-border: #b7d6ff;
+  --category-row-selected-border: #a06bff;
+  --category-row-ring-width: 1px;
+  --category-row-selected-ring-width: 1.6px;
   --navigation-font-color: #f2f4f8;
   --patch-card-font-color: #f2f4f8;
 }

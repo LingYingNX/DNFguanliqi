@@ -5,6 +5,7 @@ import {
   Globe2,
   Layers,
   PackageOpen,
+  Pencil,
   Settings,
   SlidersHorizontal,
   Trash2,
@@ -541,6 +542,10 @@ export function CategorySidebar({
         }}
         onRename={(relativePath, name) => void renameCategory(relativePath, name)}
         onSelect={selectCategory}
+        onStartRename={(relativePath) => {
+          onSelect(relativePath);
+          setEditingRelativePath(relativePath);
+        }}
         onToggle={(path) =>
           setExpandedPaths((current) => {
             const next = new Set(current);
@@ -624,6 +629,21 @@ export function CategorySidebar({
             />
           </label>
           <div className="category-context-divider" />
+          <button
+            className="category-context-action"
+            disabled={readOnly}
+            onClick={() => {
+              const relativePath = contextMenu.relativePath;
+              setContextMenu(null);
+              onSelect(relativePath);
+              setEditingRelativePath(relativePath);
+            }}
+            role="menuitem"
+            type="button"
+          >
+            <Pencil size={15} />
+            <span>重命名</span>
+          </button>
           <button
             className="category-context-action category-context-delete"
             disabled={readOnly}

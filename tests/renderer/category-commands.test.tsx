@@ -116,6 +116,104 @@ describe("category commands", () => {
     await waitFor(() => expect(request).toEqual({ relativePath: "分类A", confirmed: true }));
   });
 
+  it("renames the folder targeted by the context menu", async () => {
+    let request: Parameters<DnfApi["renameCategory"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      renameCategory: async (input) => {
+        request = input;
+        return { ok: true, value: { relativePath: "分类B" } };
+      },
+    };
+    render(<App api={api} />);
+    const category = await screen.findByRole("button", { name: "分类A" });
+    fireEvent.contextMenu(category, { clientX: 20, clientY: 20 });
+
+    const rename = screen.getByRole("menuitem", { name: "重命名" });
+    const remove = screen.getByRole("menuitem", { name: "删除文件夹" });
+    expect(rename.compareDocumentPosition(remove)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    fireEvent.click(rename);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    const input = await screen.findByRole("textbox", { name: "重命名 分类A" });
+    expect(input).toHaveValue("分类A");
+    fireEvent.change(input, { target: { value: "分类B" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(request).toEqual({ relativePath: "分类A", name: "分类B" }));
+  });
+
+  it("commits the folder rename when the input loses focus", async () => {
+    let request: Parameters<DnfApi["renameCategory"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      renameCategory: async (input) => {
+        request = input;
+        return { ok: true, value: { relativePath: "分类B" } };
+      },
+    };
+    render(<App api={api} />);
+    const category = await screen.findByRole("button", { name: "分类A" });
+    fireEvent.keyDown(category, { key: "F2" });
+    const input = await screen.findByRole("textbox", { name: "重命名 分类A" });
+
+    fireEvent.change(input, { target: { value: "分类B" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(request).toEqual({ relativePath: "分类A", name: "分类B" }));
+  });
+
+  it("cancels the folder rename when the name is unchanged on blur", async () => {
+    let request: Parameters<DnfApi["renameCategory"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      renameCategory: async (input) => {
+        request = input;
+        return { ok: true, value: { relativePath: "分类A" } };
+      },
+    };
+    render(<App api={api} />);
+    const category = await screen.findByRole("button", { name: "分类A" });
+    fireEvent.keyDown(category, { key: "F2" });
+    const input = await screen.findByRole("textbox", { name: "重命名 分类A" });
+
+    fireEvent.blur(input);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: "重命名 分类A" })).not.toBeInTheDocument(),
+    );
+    expect(request).toBeUndefined();
+  });
+
+  it("opens folder rename inline with F2", async () => {
+    render(<App api={createFakeApi(WORKSPACE_SNAPSHOT)} />);
+    const category = await screen.findByRole("button", { name: "分类A" });
+
+    fireEvent.keyDown(category, { key: "F2" });
+
+    expect(screen.getByRole("textbox", { name: "重命名 分类A" })).toHaveValue("分类A");
+  });
+
+  it("keeps F2 from starting a rename in a read-only library", async () => {
+    const api = createFakeApi(WORKSPACE_SNAPSHOT);
+    render(
+      <App
+        api={{
+          ...api,
+          getRecoveryState: async () => ({
+            ok: true,
+            value: { readOnly: true, files: ["D:\\app\\data\\settings.json"] },
+          }),
+        }}
+      />,
+    );
+    const category = await screen.findByRole("button", { name: "分类A" });
+
+    fireEvent.keyDown(category, { key: "F2" });
+
+    expect(screen.queryByRole("textbox", { name: "重命名 分类A" })).not.toBeInTheDocument();
+  });
+
   it("warns before deleting a non-empty folder from the context menu", async () => {
     let request: Parameters<DnfApi["deleteCategory"]>[0] | undefined;
     const api: DnfApi = {

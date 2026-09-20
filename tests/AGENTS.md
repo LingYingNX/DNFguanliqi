@@ -69,3 +69,6 @@ pnpm test:e2e
 
 - 修改 `DnfApi` 契约后，必须同步 `tests/renderer/fake-api.ts`。
 - 不要用 `pnpm lint` 的全量结果掩盖单文件问题；针对性跑 `biome check <文件>`。
+- **CSS 计算样式断言只能放 `tests/e2e/`**：jsdom 不做样式计算，`getComputedStyle` 的 `box-shadow`/`border-color` 在 renderer 测试里恒为空值，写在那里等于恒真断言。渲染层测交互与 DOM 结构，视觉终值（线框、光晕、过渡后颜色）用 Playwright + Electron 在 e2e 断言。
+- e2e 断言带 `transition` 的属性时必须 `expect.poll` 到终值，直接 `evaluate` 会采到过渡中间值（如 alpha 0.824）造成假红。
+- e2e 启动 Electron 一律带独立 `--user-data-dir=`（等号形式），否则用户开着应用时单实例锁会挤掉测试实例（见 `.learnings/ERRORS.md` ERR-20260917-002）。

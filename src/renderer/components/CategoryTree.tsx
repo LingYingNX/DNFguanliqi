@@ -44,6 +44,7 @@ type CategoryTreeProps = {
   readonly onContextMenu: (relativePath: string, x: number, y: number) => void;
   readonly onRename: (relativePath: string, name: string) => void;
   readonly onSelect: (relativePath: string) => void;
+  readonly onStartRename: (relativePath: string) => void;
   readonly onToggle: (relativePath: string) => void;
   readonly parentRelativePath?: string;
   readonly readOnly: boolean;
@@ -160,6 +161,7 @@ export function CategoryTree({
   onContextMenu,
   onRename,
   onSelect,
+  onStartRename,
   onToggle,
   parentRelativePath = "",
   readOnly,
@@ -205,8 +207,13 @@ export function CategoryTree({
                   <input
                     aria-label={`重命名 ${category.name}`}
                     defaultValue={category.name}
-                    onBlur={onCancelRename}
-                    onFocus={(event) => event.currentTarget.select()}
+                    onBlur={(event) => {
+                      // 失焦提交而非取消：改完名字去点别处是最自然的收尾动作，
+                      // 按取消处理会静默丢弃输入（与 ItemWorkspace 的重命名一致）。
+                      const name = event.currentTarget.value.trim();
+                      if (name === "" || name === category.name) onCancelRename();
+                      else onRename(category.relativePath, name);
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === "Escape") {
                         event.preventDefault();
@@ -220,10 +227,12 @@ export function CategoryTree({
                       }
                     }}
                     ref={(node) => {
-                      if (node !== null) {
-                        node.focus();
-                        node.select();
-                      }
+                      // 进入重命名即全选整个名字（与 Windows 一致），直接输入就能覆盖。
+                      // 内联 ref 每次渲染都会重跑，因此判断是否已聚焦，
+                      // 避免重渲染把用户已经改了一半的选区重置回全选。
+                      if (node === null || document.activeElement === node) return;
+                      node.focus();
+                      node.select();
                     }}
                   />
                 </div>
@@ -272,6 +281,16 @@ export function CategoryTree({
                     );
                     if (items.length > 0) onMoveItems(category.relativePath, items);
                   }}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) {
+                      return;
+                    }
+                    if (event.key === "F2" && !readOnly) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onStartRename(category.relativePath);
+                    }
+                  }}
                   onPointerDown={(event) => {
                     if (readOnly || event.buttons !== 1) return;
                     onCategoryDragStart({
@@ -316,6 +335,7 @@ export function CategoryTree({
                 onContextMenu={onContextMenu}
                 onRename={onRename}
                 onSelect={onSelect}
+                onStartRename={onStartRename}
                 onToggle={onToggle}
                 parentRelativePath={category.relativePath}
                 readOnly={readOnly}

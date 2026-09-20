@@ -114,7 +114,7 @@ export function WindowTitleBar({ client, update }: Props): React.JSX.Element {
         onKeyDown={handleDragRegionKeyDown}
       >
         <span className="window-titlebar-title">
-          <span>{`${client?.appInfo.name ?? "DNF 补丁管理器"} ${client?.appInfo.version ?? "1.2.5"}`}</span>
+          <span>{`${client?.appInfo.name ?? "DNF 补丁管理器"} ${client?.appInfo.version ?? "1.2.6"}`}</span>
           <span className="window-titlebar-author">作者：铃音奈绪</span>
         </span>
       </button>
