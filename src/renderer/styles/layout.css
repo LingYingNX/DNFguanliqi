@@ -115,6 +115,7 @@
 }
 
 :root {
+  --category-row-height: 32px;
   --category-toggle-size: 18px;
   --category-indent: 24px;
   --category-guide-width: 1px;
@@ -127,14 +128,36 @@
   padding-left: var(--category-indent);
 }
 
-.category-tree[data-depth]:not([data-depth="0"])::before {
+/* 竖向导引线逐节点绘制，而不是在整棵子树上拉一条到底：末项的竖线只画到自己
+   的行中线。若按「子树底部 - 行高一半」收尾，末项一旦展开子树，线就会被拖到
+   子树底部，指向没有文件夹的空白处。 */
+.category-tree[data-depth]:not([data-depth="0"]) > .category-node {
+  position: relative;
+}
+
+.category-tree[data-depth]:not([data-depth="0"]) > .category-node::before {
   position: absolute;
   top: 0;
-  bottom: 16px;
-  left: calc((var(--category-toggle-size) - var(--category-guide-width)) / 2);
+  bottom: 0;
+  left: calc(
+    (var(--category-toggle-size) - var(--category-guide-width)) / 2 - var(--category-indent)
+  );
   width: var(--category-guide-width);
   background: var(--category-guide-color);
   content: "";
+}
+
+/* 竖线从首项行中线起、到末项行中线止，两端都与水平折角相接。
+   first-child 用 :not(:last-child) 排除独子：独子应当渲染成「└」，
+   若同时命中首项规则会变成「┌」。 */
+.category-tree[data-depth]:not([data-depth="0"])
+  > .category-node:first-child:not(:last-child)::before {
+  top: calc(var(--category-row-height) / 2);
+}
+
+.category-tree[data-depth]:not([data-depth="0"]) > .category-node:last-child::before {
+  bottom: auto;
+  height: calc(var(--category-row-height) / 2);
 }
 
 .category-tree[data-depth]:not([data-depth="0"]) > .category-node > .category-node-line::before {
