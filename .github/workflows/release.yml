@@ -51,21 +51,38 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Continue"
           $expected = "${{ github.ref_name }}"
           $repo = "${{ github.repository }}"
-          $selfDraft = gh api "repos/$repo/releases/tags/$expected" --jq .draft 2>$null
-          if ($selfDraft -eq "true") {
-            Write-Output "::warning::electron-builder left release $expected as a DRAFT. Publish it manually with release notes and -F make_latest=true; electron-updater clients cannot see drafts."
-            exit 0
-          }
-          $retries = 6
+
+          # 发布是异步的：electron-builder 上传资产后才发布 Release，本步骤常先于它结束。
+          # 因此先等 Release 出现，再判断指针；查询失败不再吞成空串（空串会同时绕过
+          # 草稿检测和标签比对，把"还没发布完"误报成"指针没迁移"）。
+          $retries = 12
           for ($i = 1; $i -le $retries; $i++) {
+            $info = gh api "repos/$repo/releases/tags/$expected" 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              $draft = ($info | ConvertFrom-Json).draft
+              if ($draft -eq $true) {
+                Write-Output "::warning::electron-builder left release $expected as a DRAFT. Publish it manually with release notes and -F make_latest=true; electron-updater clients cannot see drafts."
+                exit 0
+              }
+              break
+            }
+            if ($i -eq $retries) {
+              throw "Release $expected never appeared within $($retries * 5)s: $info"
+            }
+            Write-Output "Attempt ${i}: release $expected not published yet, waiting..."
             Start-Sleep -Seconds 5
-            $latest = gh api "repos/$repo/releases/latest" --jq .tag_name 2>$null
-            if ($latest -eq $expected) {
+          }
+
+          for ($i = 1; $i -le $retries; $i++) {
+            $latest = gh api "repos/$repo/releases/latest" --jq .tag_name 2>&1
+            if ($LASTEXITCODE -eq 0 -and $latest -eq $expected) {
               Write-Output "Latest release points to $latest"
               exit 0
             }
             Write-Output "Attempt ${i}: latest is '$latest', expected '$expected'"
+            Start-Sleep -Seconds 5
           }
           throw "releases/latest points to '$latest' instead of '$expected'. electron-updater clients will not see the new version. Fix with: gh api -X PATCH repos/$repo/releases/<release-id> -F make_latest=true"

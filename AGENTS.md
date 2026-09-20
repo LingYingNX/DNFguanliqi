@@ -108,6 +108,8 @@ pnpm doctor                      # react-doctor 诊断
 - `pnpm dist:installer` 用于验证 NSIS 安装器（包括可选安装路径）；`pnpm verify:portable` 与 `pnpm verify:packaged` 当前只覆盖 portable 产物，不能据此声称 NSIS 安装路径已验证。
 - 安装目录内的 `patch-categories`（补丁库）与 `data`（配置）是用户数据，NSIS 更新与卸载必须保留。由 `build/installer-custom.nsh` 实现：`customInit` 在应用内更新时清除注册表 `UninstallString`，使更新跳过卸载步骤、直接覆盖安装（≤1.2.4 的旧卸载器无白名单、会整目录清空，绝不能让它运行，因此无需任何抢搬）；`customRemoveFiles` 在手动卸载时按白名单只删应用文件，经 `package.json` 的 `build.nsis.include` 挂载。改动打包配置或该脚本后，必须运行 `pnpm verify:nsis` 模拟安装→更新→卸载全链路验证用户数据保留。
 
+**CI 会拦截的提交**（本地跑 `bash scripts/verify-harness.sh --level=3` 可复现）：触及 `package.json`、`.github/workflows/*` 或 `scripts/*` 时必须同时更新根 `AGENTS.md`——作用域按目录前缀匹配，改 `scripts/` 时更新 `src/AGENTS.md` 不算数；`.github/pull_request_template.md` 必须存在。两者都会让 harness 以退出码 2 失败。Latest 指针校验（`release.yml`）先等 Release 出现（草稿则 warning 放行）再比对指针；查询失败不得吞成空串，否则会同时绕过草稿检测与标签比对，把"还没发布完"误报成"指针没迁移"。
+
 ### 工作范围
 
 - 只改任务点名的部分，不做顺手重构或重排。
