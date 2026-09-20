@@ -120,6 +120,8 @@
   --category-indent: 24px;
   --category-guide-width: 1px;
   --category-guide-gap: 3px;
+  /* 竖线顶端与父级展开箭头之间留出的间距，避免线贴住或穿过箭头字形。 */
+  --category-guide-arrow-gap: 6px;
   --category-guide-color: #7187a4;
 }
 
@@ -140,24 +142,36 @@
   top: 0;
   bottom: 0;
   left: calc(
-    (var(--category-toggle-size) - var(--category-guide-width)) / 2 - var(--category-indent)
+    (var(--category-toggle-size) - var(--category-guide-width)) /
+    2 -
+    var(--category-indent)
   );
   width: var(--category-guide-width);
   background: var(--category-guide-color);
   content: "";
 }
 
-/* 竖线从首项行中线起、到末项行中线止，两端都与水平折角相接。
-   first-child 用 :not(:last-child) 排除独子：独子应当渲染成「└」，
-   若同时命中首项规则会变成「┌」。 */
+/* 竖线自父级行中线下方 3px 起（不贴住、不穿过展开箭头），到末项行中线止，
+   两端都与水平折角相接，父级箭头到首个子级之间不断开。三种情形分别处理：
+   - 多项的首项：从父级中线下方起，向下交给后续同级
+   - 多项的末项：收在自己的行中线
+   - 独子：父级中线下方到自己的行中线，形成完整的「└」 */
 .category-tree[data-depth]:not([data-depth="0"])
-  > .category-node:first-child:not(:last-child)::before {
-  top: calc(var(--category-row-height) / 2);
+> .category-node:first-child:not(:last-child)::before {
+  top: calc(-0.5 * var(--category-row-height) + var(--category-guide-arrow-gap));
 }
 
-.category-tree[data-depth]:not([data-depth="0"]) > .category-node:last-child::before {
+.category-tree[data-depth]:not([data-depth="0"])
+  > .category-node:last-child:not(:first-child)::before {
   bottom: auto;
-  height: calc(var(--category-row-height) / 2);
+  height: calc(0.5 * var(--category-row-height));
+}
+
+.category-tree[data-depth]:not([data-depth="0"]) > .category-node:only-child::before {
+  top: calc(-0.5 * var(--category-row-height) + var(--category-guide-arrow-gap));
+  bottom: auto;
+  /* 顶端下移后同步收短，底端仍落在自己的行中线上。 */
+  height: calc(var(--category-row-height) - var(--category-guide-arrow-gap));
 }
 
 .category-tree[data-depth]:not([data-depth="0"]) > .category-node > .category-node-line::before {
@@ -203,7 +217,12 @@
   display: grid;
   position: relative;
   z-index: 1;
+  /* 清掉浏览器默认的按钮内边距：否则 18px 的按钮只剩 6px 内容区，
+     17px 的箭头图标从内容区左边缘溢出，字形中心比按钮盒中心偏右 6px，
+     竖线便对不上箭头。justify-content 让图标真正居中在按钮盒里。 */
+  justify-content: center;
   place-items: center;
+  padding: 0;
   border: 0;
   color: var(--color-text-secondary);
   background: transparent;

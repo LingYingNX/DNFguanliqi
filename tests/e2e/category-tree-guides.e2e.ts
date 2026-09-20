@@ -3,67 +3,97 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
 
-type GuideLine = {
-  readonly isFirst: boolean;
-  readonly isLast: boolean;
-  readonly isOnly: boolean;
+type SubtreeGeometry = {
+  readonly arrowCentreX: number;
+  readonly arrowGlyphBottom: number;
+  readonly depth: string;
   readonly lineBottom: number;
+  readonly lineLeft: number;
   readonly lineTop: number;
-  readonly rowCentre: number;
+  readonly parentRowCentre: number;
+  readonly tailRowCentre: number;
 };
 
 /**
- * 树状导引线的几何断言：每条竖线的两端必须落在对应行的中线上。
- * 回归的是「末项展开子树后，竖线被拖到子树底部、指向不存在的文件夹」这个缺陷
- * —— 当时用整棵子树的 ::before 拉一条线，收尾按固定偏移算，末项一展开就错位。
+ * 读取每棵子树竖线的实际几何，用于断言它把父级行与末项行连起来。
+ * 竖线画在各 `.category-node::before` 上，top 相对节点盒、末项改用 height 收笔，
+ * 因此这里要同时处理 top 与 height 两种取值。
  */
-async function readGuideLines(page: import("@playwright/test").Page): Promise<GuideLine[]> {
+async function readSubtrees(page: import("@playwright/test").Page): Promise<SubtreeGeometry[]> {
   return page.evaluate(() => {
     const result: Array<{
-      isFirst: boolean;
-      isLast: boolean;
-      isOnly: boolean;
+      arrowCentreX: number;
+      arrowGlyphBottom: number;
+      depth: string;
       lineBottom: number;
+      lineLeft: number;
       lineTop: number;
-      rowCentre: number;
+      parentRowCentre: number;
+      tailRowCentre: number;
     }> = [];
     for (const tree of Array.from(document.querySelectorAll<HTMLElement>(".category-tree"))) {
-      if (tree.dataset["depth"] === "0") continue;
+      const depth = tree.dataset["depth"] ?? "0";
+      if (depth === "0") continue;
       const nodes = Array.from(tree.children).filter((child) =>
         child.classList.contains("category-node"),
       );
-      nodes.forEach((node, index) => {
-        const element = node as HTMLElement;
-        const pseudo = getComputedStyle(element, "::before");
-        const nodeBox = element.getBoundingClientRect();
-        const line = node.querySelector<HTMLElement>(":scope > .category-node-line");
-        const lineBox = line?.getBoundingClientRect();
-        const offsetTop = pseudo.top === "auto" ? 0 : Number.parseFloat(pseudo.top);
-        const height = Number.parseFloat(pseudo.height);
-        const lineTop = nodeBox.top + offsetTop;
-        const lineBottom =
-          pseudo.bottom === "auto" && !Number.isNaN(height)
-            ? lineTop + height
-            : nodeBox.bottom - Number.parseFloat(pseudo.bottom);
-        result.push({
-          isFirst: index === 0,
-          isLast: index === nodes.length - 1,
-          isOnly: nodes.length === 1,
-          lineBottom,
-          lineTop,
-          rowCentre: lineBox === undefined ? 0 : lineBox.top + lineBox.height / 2,
-        });
+      const first = nodes[0];
+      const tail = nodes.at(-1);
+      if (first === undefined || tail === undefined) continue;
+
+      const parentRow = tree.parentElement?.querySelector<HTMLElement>(
+        ":scope > .category-node-line",
+      );
+      const parentBox = parentRow?.getBoundingClientRect();
+      const tailRow = tail.querySelector<HTMLElement>(":scope > .category-node-line");
+      const tailBox = tailRow?.getBoundingClientRect();
+
+      // 首项竖线的起点
+      const firstPseudo = getComputedStyle(first, "::before");
+      const firstBox = first.getBoundingClientRect();
+      const firstOffset = firstPseudo.top === "auto" ? 0 : Number.parseFloat(firstPseudo.top);
+      const lineTop = firstBox.top + firstOffset;
+      const lineLeft =
+        firstBox.left + (firstPseudo.left === "auto" ? 0 : Number.parseFloat(firstPseudo.left));
+
+      // 竖线要对准父级展开箭头的中心，而不是按钮盒中心：按钮默认内边距会把
+      // 图标挤出内容区，只按盒子几何算会偏左数像素。
+      // 字形边界取 svg 里的 path：svg 盒含图标内边距，比实际笔画大一圈。
+      const arrow = parentRow?.querySelector<HTMLElement>(".category-expand");
+      const arrowSvg = arrow?.querySelector("svg");
+      const arrowPath = arrowSvg?.querySelector("path");
+      const arrowBox = (arrowPath ?? arrowSvg ?? arrow)?.getBoundingClientRect();
+      // 末项竖线的终点：末项用 height 收笔，否则落到节点底部
+      const tailPseudo = getComputedStyle(tail, "::before");
+      const tailElementBox = tail.getBoundingClientRect();
+      const tailOffset = tailPseudo.top === "auto" ? 0 : Number.parseFloat(tailPseudo.top);
+      const tailHeight = Number.parseFloat(tailPseudo.height);
+      const lineBottom =
+        tailPseudo.bottom === "auto" && !Number.isNaN(tailHeight)
+          ? tailElementBox.top + tailOffset + tailHeight
+          : tailElementBox.bottom - Number.parseFloat(tailPseudo.bottom);
+
+      result.push({
+        arrowCentreX: arrowBox === undefined ? 0 : arrowBox.left + arrowBox.width / 2,
+        arrowGlyphBottom: arrowBox === undefined ? 0 : arrowBox.bottom,
+        depth,
+        lineBottom,
+        lineLeft,
+        lineTop,
+        parentRowCentre: parentBox === undefined ? 0 : parentBox.top + parentBox.height / 2,
+        tailRowCentre: tailBox === undefined ? 0 : tailBox.top + tailBox.height / 2,
       });
     }
     return result;
   });
 }
 
-test("stops each tree guide line at its own row centre", async () => {
+test("connects each subtree guide line from the parent row to the last child row", async () => {
   const projectRoot = resolve(import.meta.dirname, "../..");
   const runtimeRoot = await mkdtemp(join(tmpdir(), "dnf-tree-guide-e2e-"));
   const libraryRoot = join(runtimeRoot, "patch-categories");
-  // 末项自身带子树：这是触发旧缺陷的关键结构，若只建叶子节点则测不出回归。
+  // 末项自带子树：这是「竖线越过末项行中线、指向空白」的触发结构；
+  // 若测试数据里末项都是叶子，那个回归测不出来。
   await mkdir(join(libraryRoot, "父目录", "末项目录", "深层子目录"), { recursive: true });
   await mkdir(join(libraryRoot, "父目录", "中间目录"), { recursive: true });
   await mkdir(join(libraryRoot, "父目录", "独子父级", "独子"), { recursive: true });
@@ -85,24 +115,21 @@ test("stops each tree guide line at its own row centre", async () => {
     }
     await page.waitForTimeout(300);
 
-    const lines = await readGuideLines(page);
-    expect(lines.length).toBeGreaterThan(0);
+    const subtrees = await readSubtrees(page);
+    expect(subtrees.length).toBeGreaterThan(0);
 
-    // 末项竖线收在自己的行中线，不再延伸到展开后的子树底部。
-    const lastLines = lines.filter((line) => line.isLast);
-    expect(lastLines.length).toBeGreaterThan(0);
-    for (const line of lastLines) {
-      expect(Math.abs(line.lineBottom - line.rowCentre)).toBeLessThanOrEqual(2);
-    }
-
-    // 非独子的首项从自己的行中线起笔。
-    for (const line of lines.filter((entry) => entry.isFirst && !entry.isOnly)) {
-      expect(Math.abs(line.lineTop - line.rowCentre)).toBeLessThanOrEqual(2);
-    }
-
-    // 独子只保留一个「└」折角：竖线高度不超过半行。
-    for (const line of lines.filter((entry) => entry.isOnly)) {
-      expect(line.lineBottom - line.lineTop).toBeLessThanOrEqual(line.rowCentre - line.lineTop + 2);
+    for (const subtree of subtrees) {
+      // 顶端接在父级行中线下方（留间距），既不断开也不贴住展开箭头。
+      const topGap = subtree.lineTop - subtree.parentRowCentre;
+      expect(topGap).toBeGreaterThanOrEqual(4);
+      expect(topGap).toBeLessThanOrEqual(8);
+      // 顶端必须落在箭头笔画下缘之下：接进箭头内部就是「贯穿」。
+      expect(subtree.lineTop).toBeGreaterThanOrEqual(subtree.arrowGlyphBottom);
+      // 底端必须落在末项行中线：越过它就会指向没有文件夹的空白。
+      expect(Math.abs(subtree.lineBottom - subtree.tailRowCentre)).toBeLessThanOrEqual(2);
+      // 横向必须对准箭头图标中心：按按钮盒算会偏左，因为按钮默认内边距
+      // 把图标挤出内容区。
+      expect(Math.abs(subtree.lineLeft - subtree.arrowCentreX)).toBeLessThanOrEqual(1.5);
     }
   } finally {
     await application.close();
