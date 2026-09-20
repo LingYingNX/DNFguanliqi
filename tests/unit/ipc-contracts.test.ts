@@ -9,6 +9,7 @@ import {
   IPC_CHANNELS,
   MoveItemRequestSchema,
   MoveItemsRequestSchema,
+  OpenExternalUrlRequestSchema,
   RecycleBatchRequestSchema,
   ScanGroupRequestSchema,
   ScanRequestSchema,
@@ -193,6 +194,22 @@ describe("IPC request contracts", () => {
     expect(RecycleBatchRequestSchema.safeParse({ items: [group] }).success).toBe(true);
     expect(
       InstallRequestSchema.safeParse({ kind: "group", relativePath: "分类A\\套装" }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    "https://docs.qq.com/smartsheet/DRXZyb2N2eUFmWHVC",
+    "https://github.com/LingYingNX/DNFguanliqi",
+    "https://qm.qq.com/q/ZxPw28W7eg",
+    "https://space.bilibili.com/41344302",
+    "https://afdian.com/a/naixu",
+  ])("accepts allowlisted external urls", (url) => {
+    expect(OpenExternalUrlRequestSchema.safeParse({ url }).success).toBe(true);
+  });
+
+  it("rejects external urls outside the allowlist", () => {
+    expect(
+      OpenExternalUrlRequestSchema.safeParse({ url: "https://example.com/evil" }).success,
     ).toBe(false);
   });
 

@@ -15,6 +15,10 @@ export type CategoryOrderService = {
     orderedChildRelativePaths: readonly string[],
   ) => Promise<Result<void, StateStoreError>>;
   readonly move: (request: CategoryOrderMove) => Promise<Result<void, StateStoreError>>;
+  readonly relocate: (
+    sourceRelativePath: string,
+    targetRelativePath: string,
+  ) => Promise<Result<void, StateStoreError>>;
 };
 
 export type CategoryOrderMove = {
@@ -97,6 +101,22 @@ export function createCategoryOrderService(file: string): CategoryOrderService {
         request.sourceParentChildRelativePaths.map(normalizeRelativePath);
       orders[targetParentRelativePath] =
         request.targetParentChildRelativePaths.map(normalizeRelativePath);
+      return store.write({ formatVersion: 1, orders });
+    },
+    async relocate(sourceRelativePath, targetRelativePath) {
+      const result = await read();
+      if (!result.ok) return result;
+
+      const source = normalizeRelativePath(sourceRelativePath);
+      const target = normalizeRelativePath(targetRelativePath);
+      const orders: Record<string, string[]> = {};
+      for (const [parentRelativePath, childRelativePaths] of Object.entries(result.value.orders)) {
+        // 被重命名分类自身作为父级的顺序表：整表搬到新路径下。
+        const nextParent = relocateRelativePath(parentRelativePath, source, target);
+        orders[nextParent] = childRelativePaths.map((childRelativePath) =>
+          relocateRelativePath(childRelativePath, source, target),
+        );
+      }
       return store.write({ formatVersion: 1, orders });
     },
   };

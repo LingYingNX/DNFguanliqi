@@ -15,7 +15,7 @@ import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path
 import type { PreviewService, PreviewServiceError } from "../previews/preview-service";
 import type { StateStoreError } from "../state/atomic-json-store";
 import { emptyRecycleManifest, type RecycleEntry, type RecycleManifest } from "../state/schemas";
-import { prepareRecycleItems, type RecycleItemsPlan } from "./recycle-items";
+import { prepareRecycleItems, type RecycleItemsPlan, resolveRecyclePath } from "./recycle-items";
 import {
   createRecycleManifestStore,
   readRecycleManifest,
@@ -92,22 +92,6 @@ export interface RecycleService {
   empty(request: {
     readonly confirmed: boolean;
   }): Promise<Result<{ readonly removedCount: number }, RecycleServiceError>>;
-}
-
-function resolveRecyclePath(root: string, relativePath: string): string | null {
-  if (win32.isAbsolute(relativePath)) {
-    return null;
-  }
-  const candidate = win32.resolve(root, relativePath);
-  const relativeToRoot = win32.relative(root, candidate);
-  if (
-    relativeToRoot === ".." ||
-    relativeToRoot.startsWith(`..${win32.sep}`) ||
-    win32.isAbsolute(relativeToRoot)
-  ) {
-    return null;
-  }
-  return candidate;
 }
 
 export function createRecycleService(options: RecycleServiceOptions): RecycleService {

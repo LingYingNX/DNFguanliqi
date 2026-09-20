@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   decodeWorkspaceItemDrag,
   encodeWorkspaceItemDrag,
+  isWorkspaceItemsDrag,
   LIBRARY_ITEMS_DRAG_TYPE,
 } from "../workspace/item-drag";
 import {
@@ -37,7 +38,6 @@ import {
   workspaceItemReference,
 } from "../workspace/model";
 import type { SelectionModifiers } from "../workspace/useItemSelection";
-import type { WorkspaceScope } from "../workspace/useWorkspace";
 import { ContextMenu, type ContextMenuAction } from "./ContextMenu";
 
 type SelectionBox = {
@@ -51,7 +51,6 @@ type ItemWorkspaceProps = {
   readonly categoryPath: string;
   readonly enabledCounts: EnabledCounts;
   readonly enabledFilter: EnabledFilter;
-  readonly scope: WorkspaceScope;
   readonly items: readonly WorkspaceItem[];
   readonly includeDescendants: boolean;
   readonly loading: boolean;
@@ -90,7 +89,7 @@ type ItemWorkspaceProps = {
   readonly moveTargets: readonly MoveTarget[];
 };
 
-type MoveTarget = {
+export type MoveTarget = {
   readonly children: readonly MoveTarget[];
   readonly label: string;
   readonly relativePath: string;
@@ -139,10 +138,6 @@ function isSelectionExcludedTarget(target: EventTarget | null): boolean {
       ".workspace-heading, .empty-state, .item-context-menu, button, input, textarea, select, label",
     ) !== null
   );
-}
-
-function isWorkspaceItemsDrag(dataTransfer: DataTransfer): boolean {
-  return Array.from(dataTransfer.types).includes(LIBRARY_ITEMS_DRAG_TYPE);
 }
 
 type ContextMenuState = {

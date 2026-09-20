@@ -1,5 +1,8 @@
 import { ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+
+// 菜单与窗口边缘的最小间距，与侧边栏分类菜单的收边留白一致。
+const VIEWPORT_MARGIN = 8;
 
 export type ContextMenuAction = {
   readonly children?: readonly ContextMenuAction[];
@@ -125,16 +128,39 @@ export function ContextMenu({
   y,
 }: ContextMenuProps): React.JSX.Element {
   const [openPath, setOpenPath] = useState<readonly number[]>([]);
+  const [placement, setPlacement] = useState<{ left: number; top: number }>({ left: x, top: y });
   const menuRef = useRef<HTMLDivElement | null>(null);
   const openMenuPath = (path: readonly number[]): void => {
     setOpenPath((current) => (pathsEqual(current, path) ? current : path));
   };
+
+  // 菜单固定定位在光标处，滚动无法把它带回视口；向下放不下时改为向上展开，
+  // 向右放不下时向左收边，避免贴着窗口下缘/右缘右键时菜单被裁掉。
+  useLayoutEffect(() => {
+    const node = menuRef.current;
+    if (node === null) return;
+    const { width, height } = node.getBoundingClientRect();
+    if (width === 0 || height === 0) return;
+    const left =
+      x + width + VIEWPORT_MARGIN > window.innerWidth
+        ? Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN)
+        : x;
+    const top =
+      y + height + VIEWPORT_MARGIN > window.innerHeight ? Math.max(VIEWPORT_MARGIN, y - height) : y;
+    setPlacement((current) =>
+      current.left === left && current.top === top ? current : { left, top },
+    );
+  }, [x, y]);
 
   useEffect(() => {
     const closeOnPointerDown = (event: PointerEvent): void => {
       if (event.target instanceof Node && menuRef.current?.contains(event.target)) {
         return;
       }
+      onClose();
+    };
+    // 菜单不随内容滚动（fixed 定位），滚动后继续悬浮只会与卡片错位，直接关闭。
+    const closeOnScroll = (): void => {
       onClose();
     };
     const closeOnEscape = (event: KeyboardEvent): void => {
@@ -144,9 +170,11 @@ export function ContextMenu({
       }
     };
     document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("scroll", closeOnScroll, { capture: true, passive: true });
     document.addEventListener("keydown", closeOnEscape);
     return () => {
       document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("scroll", closeOnScroll, { capture: true });
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [onClose]);
@@ -157,7 +185,7 @@ export function ContextMenu({
       className={`item-context-menu card${className === undefined ? "" : ` ${className}`}`}
       onContextMenu={(event) => event.preventDefault()}
       role="menu"
-      style={{ left: x, top: y }}
+      style={{ left: placement.left, top: placement.top }}
     >
       <MenuList
         actions={actions}

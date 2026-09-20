@@ -96,8 +96,7 @@ async function resolvePatchSource(
       },
     ]);
   } catch (error) {
-    if (isNotFoundError(error)) return err({ code: "SOURCE_IO" });
-    if (error instanceof Error) return err({ code: "SOURCE_IO" });
+    if (isNotFoundError(error) || error instanceof Error) return err({ code: "SOURCE_IO" });
     throw error;
   }
 }

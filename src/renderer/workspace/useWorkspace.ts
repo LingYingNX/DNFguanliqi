@@ -286,14 +286,12 @@ export function useWorkspace(
     recycleEntries,
     refreshRecycle,
     refresh,
-    scope,
     setCategoryPath,
     setCategoryOrder,
     setEnabledFilter,
     setIncludeDescendants,
     setQuery,
     showNotice: setNotice,
-    snapshot,
     visibleItems,
   };
 }

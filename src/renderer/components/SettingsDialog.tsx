@@ -7,6 +7,7 @@ import {
   Github,
   Heart,
   Info,
+  MessageSquareWarning,
   RefreshCw,
   Settings as SettingsIcon,
   Sparkles,
@@ -20,6 +21,7 @@ import { CommandButton } from "./primitives";
 
 type SupportUrl =
   | "https://afdian.com/a/naixu"
+  | "https://docs.qq.com/smartsheet/DRXZyb2N2eUFmWHVC"
   | "https://github.com/LingYingNX/DNFguanliqi"
   | "https://qm.qq.com/q/ZxPw28W7eg"
   | "https://space.bilibili.com/41344302";
@@ -67,6 +69,11 @@ const SUPPORT_LINKS = [
 
 const PROJECT_LINKS = [
   {
+    icon: MessageSquareWarning,
+    label: "软件反馈",
+    url: "https://docs.qq.com/smartsheet/DRXZyb2N2eUFmWHVC",
+  },
+  {
     icon: Github,
     label: "项目地址",
     url: "https://github.com/LingYingNX/DNFguanliqi",
@@ -78,7 +85,7 @@ const PROJECT_LINKS = [
   },
 ] as const;
 
-function updateStatusText(update: AppUpdate): string {
+function updateStatusText(update: AppUpdate): string | null {
   const latestVersion = update.latestVersion === null ? "" : ` v${update.latestVersion}`;
   switch (update.phase) {
     case "available":
@@ -86,7 +93,8 @@ function updateStatusText(update: AppUpdate): string {
     case "checking":
       return "正在检查更新";
     case "current":
-      return "当前版本已是最新版";
+      // 右上角版本徽章已显示当前版本，再提示"已是最新版"是重复信息。
+      return null;
     case "downloading":
       return `正在下载更新 (${update.progress}%)`;
     case "downloaded":
@@ -108,6 +116,9 @@ export function SettingsDialog(props: Props): React.JSX.Element {
   const showProgressBar = update.phase === "downloading" || update.phase === "downloaded";
   const progressValue =
     update.phase === "downloaded" ? 100 : update.phase === "downloading" ? update.progress : 0;
+  const statusText = updateStatusText(update);
+  // 状态行与进度条都无内容时整块收起，让下方按钮紧贴说明框。
+  const showStatusArea = statusText !== null || showProgressBar;
 
   useEffect(() => {
     setDraft(props.gameDirectory ?? "");
@@ -213,68 +224,6 @@ export function SettingsDialog(props: Props): React.JSX.Element {
               </section>
             ) : (
               <section className="settings-detail-section">
-                <article className="settings-update-card">
-                  <div className="settings-update-header">
-                    <h3>软件更新</h3>
-                    <span className="settings-version-badge">当前版本 v{props.currentVersion}</span>
-                  </div>
-                  <div className="settings-changelog-heading">更新说明</div>
-                  <div className="settings-changelog-box">
-                    <ul className="settings-changelog">
-                      {update.releaseNotes.length > 0 ? (
-                        update.releaseNotes.map((entry) => <li key={entry}>{entry}</li>)
-                      ) : (
-                        <li>暂无发行说明</li>
-                      )}
-                    </ul>
-                  </div>
-                  <div className="settings-update-footer">
-                    <div className="settings-update-progress-stack">
-                      <div className="settings-progress-info">
-                        <span>{updateStatusText(update)}</span>
-                        {showProgressBar ? <span>{progressValue}%</span> : null}
-                      </div>
-                      {showProgressBar ? (
-                        <progress
-                          aria-label="更新进度"
-                          className="settings-update-progress"
-                          max={100}
-                          value={progressValue}
-                        />
-                      ) : (
-                        <div aria-hidden="true" className="settings-update-progress-placeholder" />
-                      )}
-                    </div>
-                    <div className="settings-update-actions">
-                      <button
-                        className="settings-update-secondary"
-                        disabled={update.phase === "checking" || update.phase === "downloading"}
-                        onClick={() => void update.check(true)}
-                        type="button"
-                      >
-                        <RefreshCw aria-hidden="true" size={14} />
-                        检查更新
-                      </button>
-                      <button
-                        className="settings-update-primary"
-                        disabled={update.phase !== "available" && update.phase !== "downloaded"}
-                        onClick={() =>
-                          void (update.phase === "downloaded"
-                            ? update.install()
-                            : update.download())
-                        }
-                        type="button"
-                      >
-                        {update.phase === "downloaded" ? (
-                          <CheckCircle2 aria-hidden="true" size={14} />
-                        ) : (
-                          <Download aria-hidden="true" size={14} />
-                        )}
-                        {update.phase === "downloaded" ? "重启安装" : "立即更新"}
-                      </button>
-                    </div>
-                  </div>
-                </article>
                 <div className="settings-project-links">
                   {PROJECT_LINKS.map((link) => {
                     const LinkIcon = link.icon;
@@ -324,6 +273,68 @@ export function SettingsDialog(props: Props): React.JSX.Element {
                     );
                   })}
                 </div>
+                <article className="settings-update-card">
+                  <div className="settings-update-header">
+                    <h3>软件更新</h3>
+                    <span className="settings-version-badge">当前版本 v{props.currentVersion}</span>
+                  </div>
+                  <div className="settings-changelog-heading">更新说明</div>
+                  <div className="settings-changelog-box">
+                    <ul className="settings-changelog">
+                      {update.releaseNotes.length > 0 ? (
+                        update.releaseNotes.map((entry) => <li key={entry}>{entry}</li>)
+                      ) : (
+                        <li>暂无发行说明</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div className="settings-update-footer">
+                    {showStatusArea ? (
+                      <div className="settings-update-progress-stack">
+                        <div className="settings-progress-info">
+                          {statusText === null ? null : <span>{statusText}</span>}
+                          {showProgressBar ? <span>{progressValue}%</span> : null}
+                        </div>
+                        {showProgressBar ? (
+                          <progress
+                            aria-label="更新进度"
+                            className="settings-update-progress"
+                            max={100}
+                            value={progressValue}
+                          />
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="settings-update-actions">
+                      <button
+                        className="settings-update-secondary"
+                        disabled={update.phase === "checking" || update.phase === "downloading"}
+                        onClick={() => void update.check(true)}
+                        type="button"
+                      >
+                        <RefreshCw aria-hidden="true" size={14} />
+                        检查更新
+                      </button>
+                      <button
+                        className="settings-update-primary"
+                        disabled={update.phase !== "available" && update.phase !== "downloaded"}
+                        onClick={() =>
+                          void (update.phase === "downloaded"
+                            ? update.install()
+                            : update.download())
+                        }
+                        type="button"
+                      >
+                        {update.phase === "downloaded" ? (
+                          <CheckCircle2 aria-hidden="true" size={14} />
+                        ) : (
+                          <Download aria-hidden="true" size={14} />
+                        )}
+                        {update.phase === "downloaded" ? "重启安装" : "立即更新"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
               </section>
             )}
           </div>

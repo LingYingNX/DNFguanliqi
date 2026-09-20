@@ -15,7 +15,7 @@ import { useWorkspaceOperations } from "../workspace/useWorkspaceOperations";
 import { AppearanceDialog } from "./AppearanceDialog";
 import { type CategoryDialog, CategoryDialogs } from "./CategoryDialogs";
 import { CategorySidebar } from "./CategorySidebar";
-import { ItemWorkspace } from "./ItemWorkspace";
+import { ItemWorkspace, type MoveTarget } from "./ItemWorkspace";
 import { type OperationDialog, OperationDialogs } from "./OperationDialogs";
 import { type PresetDialog, PresetDialogs } from "./PresetDialogs";
 import { PresetWorkspace } from "./PresetWorkspace";
@@ -44,13 +44,6 @@ function moveTargets(
     }));
   return mapTargets(snapshot.childCategories);
 }
-
-type MoveTarget = {
-  readonly children: readonly MoveTarget[];
-  readonly label: string;
-  readonly relativePath: string;
-  readonly disabled: boolean;
-};
 
 export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
   const [navigation, setNavigation] = useState<NavigationSelection>({ kind: "all" });
@@ -255,7 +248,6 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
           });
         }}
         readOnly={recovery.readOnly}
-        scope={workspace.scope}
         showDescendantToggle={navigation.kind !== "uncategorized" && navigation.kind !== "group"}
         visibleItems={workspace.visibleItems}
         viewMode={viewMode}

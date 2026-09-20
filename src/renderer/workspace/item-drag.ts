@@ -19,6 +19,10 @@ export function encodeWorkspaceItemDrag(items: readonly WorkspaceItemReference[]
   return JSON.stringify(items);
 }
 
+export function isWorkspaceItemsDrag(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).includes(LIBRARY_ITEMS_DRAG_TYPE);
+}
+
 export function decodeWorkspaceItemDrag(value: string): readonly WorkspaceItemReference[] {
   try {
     const parsed: unknown = JSON.parse(value);

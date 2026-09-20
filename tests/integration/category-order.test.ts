@@ -64,6 +64,52 @@ describe("category order state", () => {
     });
   });
 
+  it("keeps the saved position when a category is renamed", async () => {
+    // Given: a parent whose children carry an explicit non-alphabetical order.
+    const directory = await mkdtemp(join(tmpdir(), "dnf-category-order-"));
+    temporaryDirectories.push(directory);
+    const file = join(directory, "category-order.json");
+    const service = createCategoryOrderService(file);
+    await service.set("", ["Zeta", "Alpha"]);
+    await service.set("Zeta", ["Zeta\\Second", "Zeta\\First"]);
+
+    // When: the middle child is renamed.
+    const result = await service.relocate("Zeta", "Renamed");
+
+    // Then: the renamed entry keeps its slot and its own child order follows the new path.
+    expect(result).toEqual({ ok: true, value: undefined });
+    await expect(service.get("")).resolves.toEqual({ ok: true, value: ["Renamed", "Alpha"] });
+    await expect(service.get("Renamed")).resolves.toEqual({
+      ok: true,
+      value: ["Renamed\\Second", "Renamed\\First"],
+    });
+  });
+
+  it("relocates descendant order keys when a renamed category has children", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "dnf-category-order-"));
+    temporaryDirectories.push(directory);
+    const file = join(directory, "category-order.json");
+    const service = createCategoryOrderService(file);
+    await service.set("", ["Female"]);
+    await service.set("Female", ["Female\\Male", "Female\\Other"]);
+    await service.set("Female\\Male", ["Female\\Male\\Nested"]);
+    await service.set("Interface", ["Interface\\Existing"]);
+
+    const result = await service.relocate("Female", "Renamed");
+
+    expect(result).toEqual({ ok: true, value: undefined });
+    // 被改名分类自身及其后代的顺序表全部迁到新路径，无关父级保持不变。
+    await expect(service.getAll()).resolves.toEqual({
+      ok: true,
+      value: {
+        "": ["Renamed"],
+        Renamed: ["Renamed\\Male", "Renamed\\Other"],
+        "Renamed\\Male": ["Renamed\\Male\\Nested"],
+        Interface: ["Interface\\Existing"],
+      },
+    });
+  });
+
   it("reports corrupted state instead of resetting the order", async () => {
     // Given: a corrupted persisted category order.
     const directory = await mkdtemp(join(tmpdir(), "dnf-category-order-"));

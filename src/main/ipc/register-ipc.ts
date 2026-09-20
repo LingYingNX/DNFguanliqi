@@ -165,6 +165,7 @@ export async function registerIpc(
         return styleResult.ok ? result : toApiResult(styleResult);
       }),
     paths,
+    categoryOrder,
     categoryStyle,
   });
   registerPresetIpc({ getInstallService, mutationMutex, paths });

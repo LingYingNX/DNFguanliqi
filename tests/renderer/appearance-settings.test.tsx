@@ -26,6 +26,7 @@ describe("appearance settings", () => {
     expect(
       within(settingsDialog).queryByRole("heading", { name: "支持与社区" }),
     ).not.toBeInTheDocument();
+    expect(within(settingsDialog).getByRole("button", { name: "软件反馈" })).toBeInTheDocument();
     expect(within(settingsDialog).getByRole("button", { name: "项目地址" })).toBeInTheDocument();
     expect(within(settingsDialog).getByRole("button", { name: "QQ群交流" })).toBeInTheDocument();
     expect(within(settingsDialog).getByText("请作者喝杯咖啡 ☕")).toBeInTheDocument();
@@ -38,9 +39,10 @@ describe("appearance settings", () => {
     expect(
       within(settingsDialog).queryByRole("progressbar", { name: "更新进度" }),
     ).not.toBeInTheDocument();
+    expect(within(settingsDialog).getByText(/已检测到新版本/u)).toBeInTheDocument();
     expect(
       settingsDialog.querySelector(".settings-update-progress-placeholder"),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(within(settingsDialog).queryAllByRole("slider")).toHaveLength(0);
     expect(screen.queryByRole("dialog", { name: "调整外观" })).not.toBeInTheDocument();
 
@@ -71,6 +73,13 @@ describe("appearance settings", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "设置" }));
     fireEvent.click(screen.getByRole("tab", { name: "关于软件" }));
+    fireEvent.click(screen.getByRole("button", { name: "软件反馈" }));
+    await waitFor(() =>
+      expect(openExternalUrl).toHaveBeenLastCalledWith({
+        url: "https://docs.qq.com/smartsheet/DRXZyb2N2eUFmWHVC",
+      }),
+    );
+
     fireEvent.click(screen.getByRole("button", { name: "项目地址" }));
     await waitFor(() =>
       expect(openExternalUrl).toHaveBeenLastCalledWith({
@@ -146,10 +155,15 @@ describe("appearance settings", () => {
     expect(within(settingsDialog).getByText("当前版本 v1.1.0")).toBeInTheDocument();
     expect(within(settingsDialog).getByText("当前版本发行说明")).toBeInTheDocument();
     expect(within(settingsDialog).queryByText(/最新版本/u)).not.toBeInTheDocument();
-    expect(within(settingsDialog).queryByText("当前版本已是最新版")).toBeInTheDocument();
+    // 已是最新版时右上角版本徽章已表达该信息，卡片内不再重复提示状态行。
+    expect(within(settingsDialog).queryByText("当前版本已是最新版")).not.toBeInTheDocument();
+    expect(within(settingsDialog).queryByText("点击检查更新获取最新版本")).not.toBeInTheDocument();
+    // 状态区整块收起，让"检查更新/立即更新"紧贴说明框，不再隔着空白。
+    expect(settingsDialog.querySelector(".settings-update-progress-stack")).toBeNull();
+    expect(settingsDialog.querySelector(".settings-update-actions")).not.toBeNull();
     expect(
       settingsDialog.querySelector(".settings-update-progress-placeholder"),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(within(settingsDialog).getByRole("button", { name: "立即更新" })).toBeDisabled();
   });
 

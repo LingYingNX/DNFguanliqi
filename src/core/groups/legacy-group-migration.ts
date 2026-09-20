@@ -6,7 +6,7 @@ import { pathKey } from "../../shared/path-key";
 import { err, ok, type Result } from "../../shared/result";
 import type { FileTransactionError, FileTransactionStep } from "../filesystem/file-transaction";
 import { executeFileTransaction } from "../filesystem/file-transaction";
-import { isNotFoundError } from "../filesystem/path-exists";
+import { pathExists } from "../filesystem/path-exists";
 import { type GroupMarker, readGroupMarker } from "../library/group-marker";
 import { findMatchingPreview, LIBRARY_PREVIEW_EXTENSIONS } from "../library/library-preview";
 import type { LibraryPathError } from "../paths/library-path";
@@ -126,7 +126,7 @@ async function prepareLegacyGroup(
         return err({ code: "LEGACY_GROUP_INVALID", relativePath: sourceRelativePath });
       }
       const targetPath = win32.join(win32.dirname(directoryPath), name);
-      if (await exists(targetPath)) {
+      if (await pathExists(targetPath)) {
         return err({ code: "LEGACY_GROUP_CONFLICT", relativePath: targetRelativePath });
       }
       memberFiles.push({
@@ -163,22 +163,9 @@ async function prepareLegacyGroup(
       previewRelativePath,
     });
   } catch (error) {
-    if (error instanceof Error && isNotFoundError(error)) {
-      return err({ code: "LEGACY_GROUP_IO", relativePath: directoryRelativePath });
-    }
     if (error instanceof Error) {
       return err({ code: "LEGACY_GROUP_IO", relativePath: directoryRelativePath });
     }
-    throw error;
-  }
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await lstat(path);
-    return true;
-  } catch (error) {
-    if (isNotFoundError(error)) return false;
     throw error;
   }
 }

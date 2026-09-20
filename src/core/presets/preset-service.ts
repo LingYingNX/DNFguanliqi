@@ -16,7 +16,11 @@ import { err, ok, type Result } from "../../shared/result";
 import type { InstallService, InstallServiceError } from "../install/install-service";
 import { type LibraryPathError, resolveLibraryPath } from "../paths/library-path";
 import { isNpkPath } from "../paths/relative-path";
-import type { AtomicJsonStore, StateStoreError } from "../state/atomic-json-store";
+import {
+  type AtomicJsonStore,
+  readOrFallback,
+  type StateStoreError,
+} from "../state/atomic-json-store";
 import type { PresetState } from "./preset-state";
 
 export type PresetServiceError =
@@ -98,13 +102,8 @@ export function createPresetService(options: PresetServiceOptions): PresetServic
   const createId = options.createId ?? randomUUID;
   const now = options.now ?? (() => new Date());
 
-  const readState = async (): Promise<Result<PresetState, PresetServiceError>> => {
-    const result = await options.store.read();
-    if (result.ok) {
-      return result;
-    }
-    return result.error.code === "STATE_MISSING" ? ok({ formatVersion: 1, presets: [] }) : result;
-  };
+  const readState = async (): Promise<Result<PresetState, PresetServiceError>> =>
+    readOrFallback(options.store, () => ({ formatVersion: 1, presets: [] }));
 
   const writeState = async (state: PresetState): Promise<Result<void, PresetServiceError>> =>
     options.store.write(state);

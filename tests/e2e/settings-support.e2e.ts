@@ -21,7 +21,11 @@ test("renders the community entries within the settings dialog", async () => {
     const bilibiliCard = dialog.locator('.settings-support-card[data-support="bilibili"]');
     const supportButton = dialog.getByRole("button", { name: "去赞助" });
     const bilibiliButton = dialog.getByRole("button", { name: "去关注" });
-    await expect(dialog.getByRole("heading", { name: "支持与社区" })).toBeVisible();
+    // "支持与社区" 标题已随设置面板改版移除（见 tests/renderer/appearance-settings.test.tsx
+    // 对其 not.toBeInTheDocument 的断言），改为断言实际渲染的支持入口。
+    await expect(dialog.getByRole("button", { name: "软件反馈" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "项目地址" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "QQ群交流" })).toBeVisible();
     await expect(dialog.getByText("请作者喝杯咖啡 ☕")).toBeVisible();
     await expect(
       dialog.getByText(

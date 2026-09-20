@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { executeFileTransaction } from "../../src/core/filesystem/file-transaction";
+import { resolveRecyclePath } from "../../src/core/recycle/recycle-items";
 import { createRecycleService } from "../../src/core/recycle/recycle-service";
 import { resolveAppPaths } from "../../src/main/app-paths";
 
@@ -100,5 +101,24 @@ describe("batch recycle", () => {
     await expect(access(join(paths.dataRoot, "recycle-bin.json"))).rejects.toMatchObject({
       code: "ENOENT",
     });
+  });
+});
+
+describe("recycle path containment", () => {
+  const recycleRoot = "C:\\data\\recycle-bin";
+
+  it.each([
+    { case: "绝对路径", relativePath: "C:\\Windows\\System32\\evil.npk" },
+    { case: "UNC 绝对路径", relativePath: "\\\\server\\share\\evil.npk" },
+    { case: "父级穿越", relativePath: "..\\outside.npk" },
+    { case: "深层父级穿越", relativePath: "a\\..\\..\\outside.npk" },
+  ])("rejects $case outside the recycle root", ({ relativePath }) => {
+    expect(resolveRecyclePath(recycleRoot, relativePath)).toBeNull();
+  });
+
+  it("resolves a plain child path inside the recycle root", () => {
+    expect(resolveRecyclePath(recycleRoot, "id\\patch.npk")).toBe(
+      "C:\\data\\recycle-bin\\id\\patch.npk",
+    );
   });
 });

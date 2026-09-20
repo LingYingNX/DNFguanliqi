@@ -21,8 +21,11 @@ const CANONICAL_FILES = {
   normalizedPathKey: ["src/core/paths/relative-path.ts"],
   parentRelativePath: ["src/core/paths/relative-path.ts"],
   isNotFoundError: ["src/core/filesystem/path-exists.ts"],
+  pathExists: ["src/core/filesystem/path-exists.ts"],
   isSafeRelativePath: ["src/shared/relative-path-guard.ts"],
   readOrFallback: ["src/core/state/atomic-json-store.ts"],
+  resolveRecyclePath: ["src/core/recycle/recycle-items.ts"],
+  isWorkspaceItemsDrag: ["src/renderer/workspace/item-drag.ts"],
   // 以下两个在 category-commands / category-style-service 各有一份，
   // 因其归一化方式不同（win32.normalize / 去掉 .\ 前缀）而有意保留。
   normalizeRelativePath: [

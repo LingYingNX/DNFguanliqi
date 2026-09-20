@@ -85,11 +85,15 @@ pnpm build
 | 去掉 `./` 前缀 | 同上 `normalizeRelativePath` | 不转小写，调用方自行决定 |
 | 已存在路径的身份比较 | 同上 `normalizedPathKey`（`win32.normalize` 后转小写） | 会折叠 `..`/`.`，与 `pathKey` **语义不同，不可互换** |
 | 捕获 ENOENT | `core/filesystem/path-exists.ts` 的 `isNotFoundError` | 勿写 `error.code === "ENOENT"` 内联判断 |
+| 判断路径是否存在 | 同上 `pathExists` | 勿写本地 `exists()`（`legacy-group-migration.ts` 曾有此副本，因改换函数名而逃过检查脚本） |
 | 状态读取回退默认值 | `core/state/atomic-json-store.ts` 的 `readOrFallback` | 勿重写 `STATE_MISSING` 分支 |
+| 回收站相对路径越界校验 | `core/recycle/recycle-items.ts` 的 `resolveRecyclePath` | 回收站根与库根不同，**不要**改用 `resolveLibraryPath` |
+| 判断是否为工作区项目拖拽 | `renderer/workspace/item-drag.ts` 的 `isWorkspaceItemsDrag` | 勿写本地副本（曾在 `ItemWorkspace`/`CategoryTree` 各有一份） |
 
 约束：
 
 - **`pathKey` 与 `normalizedPathKey` 不可互换**：前者是纯字符串键（保留 `a//b`、`./a`、`a/../b` 原样），后者走 `win32.normalize` 会折叠。混用会静默改变去重与匹配行为；已有单测锁定该差异（`tests/unit/relative-path.test.ts`）。
 - 允许保留的例外：`group-marker.ts` 与 `group-service.ts` 的 ENOENT 判断用更窄的 `error instanceof Error` 形式，比 `isNotFoundError` 限制更严，合并会放宽输入范围，故有意保留。同理 `AppearanceDialog` 的 `hexToHsv`/`hsvToHex` 与 `CategorySidebar` 的 `hexToHue`/`hueToHex` 存在 ±1 度取整差异，**不得合并**。
 - 新增共享辅助前先在本文件与 `src/shared/`、`src/core/paths/` 搜索；确认不存在才新增，并在本表登记。
+- **检查脚本按函数名匹配，改名副本是已知盲区**：`scripts/check-path-helpers.mjs` 只拦截"同名 function 重复声明"与固定的内联表达式。把 `pathExists` 抄成 `exists`、把 `isWorkspaceItemsDrag` 抄成 `isLibraryItemsDrag` 都能通过 CI。因此重构时不要只依赖 `pnpm verify:no-dup-helpers` 的绿灯，要按本表逐个语义核对。
 - 修改上表任一函数时，同步跑 `pnpm vitest run tests/unit/path-key.test.ts tests/unit/relative-path.test.ts tests/unit/relative-path-guard.test.ts`。

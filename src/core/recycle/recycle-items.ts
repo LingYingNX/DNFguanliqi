@@ -18,7 +18,7 @@ export type RecycleItemsPlan = {
   readonly steps: readonly FileTransactionStep[];
 };
 
-function resolveRecyclePath(root: string, relativePath: string): string | null {
+export function resolveRecyclePath(root: string, relativePath: string): string | null {
   if (win32.isAbsolute(relativePath)) return null;
   const candidate = win32.resolve(root, relativePath);
   const relativeToRoot = win32.relative(root, candidate);

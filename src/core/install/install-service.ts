@@ -16,7 +16,7 @@ import {
 } from "./disable-install-items";
 import { enableInstallItems } from "./enable-install-items";
 import type { InstallSourceError } from "./install-sources";
-import { createInstallationStateStore, type InstallationStateSnapshot } from "./installation-state";
+import { createInstallationStateStore } from "./installation-state";
 import {
   prepareRelocateInstallations,
   type RelocateInstallationRequest,
@@ -138,5 +138,3 @@ export type InstallBatchContext = {
   readonly now: () => Date;
   readonly executeTransaction: FileTransactionExecutor;
 };
-
-export type InstallationSnapshot = InstallationStateSnapshot;

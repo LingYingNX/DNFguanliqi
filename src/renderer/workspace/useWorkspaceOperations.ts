@@ -83,8 +83,6 @@ export function useWorkspaceOperations({
     }
   };
 
-  const setEnabled = (enabled: boolean): Promise<boolean> => setEnabledFor(selectedItems, enabled);
-
   const dissolveGroup = async (): Promise<boolean> => {
     const api = withClient();
     const group = selectedItems[0];
@@ -300,7 +298,6 @@ export function useWorkspaceOperations({
     rename,
     renameItem,
     restore,
-    setEnabled,
     setEnabledFor,
   };
 }

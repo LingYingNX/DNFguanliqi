@@ -2,7 +2,11 @@ import { ChevronDown, ChevronRight, Folder } from "lucide-react";
 import type { CategoryFolderStyle } from "../../shared/category-styles";
 import type { ChildCategory } from "../../shared/library-dto";
 import { isPathWithin } from "../../shared/path-key";
-import { decodeWorkspaceItemDrag, LIBRARY_ITEMS_DRAG_TYPE } from "../workspace/item-drag";
+import {
+  decodeWorkspaceItemDrag,
+  isWorkspaceItemsDrag,
+  LIBRARY_ITEMS_DRAG_TYPE,
+} from "../workspace/item-drag";
 import type { WorkspaceItemReference } from "../workspace/model";
 
 export type CategoryDropPosition = "before" | "inside" | "after";
@@ -104,10 +108,6 @@ function dropPosition(event: React.PointerEvent<HTMLButtonElement>): CategoryDro
   if (offset < edge) return "before";
   if (offset > rect.height - edge) return "after";
   return "inside";
-}
-
-function isLibraryItemsDrag(dataTransfer: DataTransfer): boolean {
-  return Array.from(dataTransfer.types).includes(LIBRARY_ITEMS_DRAG_TYPE);
 }
 
 function resolveDropTarget(
@@ -252,7 +252,7 @@ export function CategoryTree({
                     onContextMenu(category.relativePath, event.clientX, event.clientY);
                   }}
                   onDragEnter={(event) => {
-                    if (readOnly || !isLibraryItemsDrag(event.dataTransfer)) return;
+                    if (readOnly || !isWorkspaceItemsDrag(event.dataTransfer)) return;
                     event.preventDefault();
                     event.dataTransfer.dropEffect = "move";
                     onItemDragOver(category.relativePath);
@@ -268,7 +268,7 @@ export function CategoryTree({
                   }}
                   onDragOver={(event) => {
                     event.preventDefault();
-                    if (readOnly || !isLibraryItemsDrag(event.dataTransfer)) return;
+                    if (readOnly || !isWorkspaceItemsDrag(event.dataTransfer)) return;
                     event.dataTransfer.dropEffect = "move";
                     onItemDragOver(category.relativePath);
                   }}
