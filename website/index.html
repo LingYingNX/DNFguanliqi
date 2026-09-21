@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DNF 补丁管理器</title>
+<meta name="description" content="DNF 补丁管理器：Windows 桌面工具，整理本地 .npk 补丁——导入扫描、树状分类、封面预览、一键启用 / 禁用。当前版本 1.2.6。" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg: #0B0D16;
+  --bg-deep: #07090F;
+  --card: #141827;
+  --card-2: #1A1F33;
+  --fg: #E8EAF2;
+  --fg-muted: #9AA3B8;
+  --accent: #F43F5E;
+  --accent-soft: #FDA4AF;
+  --gold: #F5C451;
+  --border: rgba(244, 63, 94, 0.16);
+  --border-n: rgba(232, 234, 242, 0.10);
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+  --space-6: 64px;
+  --space-7: 88px;
+  --radius: 14px;
+  --font-display: "Chakra Petch", "Noto Sans SC", sans-serif;
+  --font-body: "Noto Sans SC", "Chakra Petch", sans-serif;
+  --shadow-card: 0 10px 34px rgba(3, 4, 10, 0.6);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: rgba(244, 63, 94, 0.5); color: #fff; }
+a { color: var(--accent-soft); text-decoration: none; }
+a:hover { color: #fecdd3; }
+img { max-width: 100%; display: block; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--accent); color: #fff; padding: 10px 18px; border-radius: 0 0 10px 0;
+}
+.skip-link:focus { left: 0; }
+
+/* ---------- 星空 ---------- */
+#starfield { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.glow { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.glow::before, .glow::after { content: ""; position: absolute; border-radius: 50%; filter: blur(100px); }
+.glow::before {
+  width: 52vw; height: 52vw; left: -16vw; top: -20vw;
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.13), transparent 66%);
+}
+.glow::after {
+  width: 40vw; height: 40vw; right: -12vw; bottom: -14vw;
+  background: radial-gradient(circle, rgba(245, 196, 81, 0.07), transparent 66%);
+}
+.page { position: relative; z-index: 1; }
+.container { width: min(1080px, 92vw); margin-inline: auto; }
+
+/* ---------- 顶栏 ---------- */
+header.site {
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  background: rgba(11, 13, 22, 0.74);
+  border-bottom: 1px solid var(--border-n);
+}
+.nav { display: flex; align-items: center; gap: var(--space-3); height: 62px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--fg); font-family: var(--font-display); }
+.brand:hover { color: #fff; }
+.brand svg { width: 26px; height: 26px; flex: none; }
+.brand b { font-size: 16.5px; font-weight: 700; letter-spacing: 0.02em; }
+.brand .ver {
+  font-size: 11px; font-weight: 600; color: var(--gold);
+  border: 1px solid rgba(245, 196, 81, 0.3); border-radius: 999px; padding: 1px 8px;
+  background: rgba(245, 196, 81, 0.08);
+}
+.nav-links { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; list-style: none; }
+.nav-links a { color: var(--fg-muted); font-size: 14.5px; font-weight: 500; transition: color 0.2s; }
+.nav-links a:hover { color: var(--fg); }
+.nav-actions { display: flex; align-items: center; gap: 12px; margin-left: var(--space-2); }
+.menu-btn {
+  display: none; margin-left: auto; background: none; border: 1px solid var(--border-n);
+  color: var(--fg); border-radius: 10px; padding: 8px 10px; cursor: pointer;
+}
+.menu-btn svg { width: 20px; height: 20px; display: block; }
+
+/* ---------- 按钮 ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-family: var(--font-display); font-weight: 600; font-size: 15px;
+  border-radius: 12px; padding: 12px 22px; cursor: pointer; border: 1px solid transparent;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  text-decoration: none; line-height: 1.2; white-space: nowrap;
+}
+.btn svg { width: 18px; height: 18px; flex: none; }
+.btn:active { transform: translateY(1px) scale(0.99); }
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 6px 22px rgba(244, 63, 94, 0.32); }
+.btn-primary:hover { background: #FB5E77; color: #fff; box-shadow: 0 10px 30px rgba(244, 63, 94, 0.42); transform: translateY(-1px); }
+.btn-ghost { background: rgba(20, 24, 39, 0.65); color: var(--fg); border-color: var(--border-n); }
+.btn-ghost:hover { border-color: rgba(253, 164, 175, 0.45); color: #fff; background: rgba(244, 63, 94, 0.10); transform: translateY(-1px); }
+.btn-sm { padding: 9px 16px; font-size: 13.5px; border-radius: 10px; }
+.dl-hint { margin: 12px 0 0; font-size: 13px; color: var(--fg-muted); }
+.dl-hint code { font-family: var(--font-display); font-weight: 600; color: var(--gold); background: rgba(245, 196, 81, 0.08); border: 1px solid rgba(245, 196, 81, 0.3); border-radius: 6px; padding: 1px 7px; letter-spacing: 0.08em; }
+
+/* ---------- Hero ---------- */
+.hero { padding: var(--space-6) 0 var(--space-5); }
+.hero-inner { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: var(--space-5); align-items: center; }
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 500; color: var(--gold);
+  border: 1px solid rgba(245, 196, 81, 0.28); background: rgba(245, 196, 81, 0.07);
+  border-radius: 999px; padding: 5px 14px; margin-bottom: var(--space-3);
+}
+.hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+h1 {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4.4vw, 50px);
+  font-weight: 700; line-height: 1.2; letter-spacing: 0.01em;
+  margin-bottom: var(--space-2);
+}
+.hero p.sub { color: var(--fg-muted); font-size: clamp(14.5px, 1.5vw, 16.5px); margin-bottom: var(--space-4); max-width: 46ch; }
+.hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: var(--space-3); }
+.hero-meta { display: flex; gap: 18px; flex-wrap: wrap; color: var(--fg-muted); font-size: 13px; }
+.hero-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.hero-meta svg { width: 14px; height: 14px; color: var(--accent-soft); }
+
+/* 截图展示（平铺） */
+.shot {
+  border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--border-n);
+  background: var(--card);
+  box-shadow: 0 18px 50px rgba(3, 4, 10, 0.62);
+}
+.shot img { width: 100%; height: auto; }
+
+/* ---------- 区块 ---------- */
+section { padding: var(--space-6) 0; }
+.sec-title {
+  font-family: var(--font-display); font-size: clamp(22px, 2.6vw, 30px);
+  font-weight: 700; margin-bottom: var(--space-4);
+  display: flex; align-items: center; gap: 14px;
+}
+.sec-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-n), transparent); }
+.sec-title .idx { font-size: 14px; color: var(--accent); font-weight: 600; letter-spacing: 0.1em; }
+
+/* ---------- 功能 ---------- */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-3); }
+.card {
+  background: linear-gradient(165deg, rgba(26, 31, 51, 0.7), rgba(20, 24, 39, 0.9));
+  border: 1px solid var(--border-n);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-3) 28px;
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+.card:hover { transform: translateY(-4px); border-color: rgba(253, 164, 175, 0.35); box-shadow: 0 14px 40px rgba(3, 4, 10, 0.55); }
+.card .ico {
+  width: 42px; height: 42px; border-radius: 11px;
+  display: grid; place-items: center; margin-bottom: var(--space-2);
+  background: rgba(244, 63, 94, 0.10); border: 1px solid rgba(244, 63, 94, 0.22);
+  color: var(--accent-soft);
+}
+.card .ico svg { width: 21px; height: 21px; }
+.card h3 { font-family: var(--font-display); font-size: 17.5px; font-weight: 600; margin-bottom: 6px; }
+.card p { color: var(--fg-muted); font-size: 14px; }
+
+/* ---------- 更新 ---------- */
+.update-card {
+  background: linear-gradient(165deg, rgba(26, 31, 51, 0.75), rgba(20, 24, 39, 0.92));
+  border: 1px solid var(--border-n); border-radius: 16px;
+  padding: var(--space-4);
+  max-width: 720px;
+}
+.update-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: var(--space-3); }
+.update-head .v { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: #fff; }
+.update-head .date { color: var(--fg-muted); font-size: 13px; }
+.update-head .tag {
+  font-size: 11.5px; font-weight: 600; color: var(--bg); background: var(--gold);
+  border-radius: 999px; padding: 2px 11px; letter-spacing: 0.05em;
+}
+.update-list { list-style: none; display: grid; gap: 10px; margin-bottom: var(--space-3); }
+.update-list li { display: flex; gap: 11px; color: var(--fg); font-size: 14.5px; }
+.update-list li::before { content: "—"; color: var(--accent); flex: none; }
+.update-foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--border-n); padding-top: var(--space-3); }
+.update-foot p { color: var(--fg-muted); font-size: 13px; }
+
+/* ---------- 页脚 ---------- */
+footer.site {
+  border-top: 1px solid var(--border-n);
+  padding: var(--space-4) 0;
+  margin-top: var(--space-5);
+}
+.foot-flex { display: flex; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
+.foot-flex .brand b { font-size: 15px; }
+.foot-links { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.foot-links a { color: var(--fg-muted); font-size: 13.5px; }
+.foot-links a:hover { color: var(--accent-soft); }
+.foot-bottom { margin-top: var(--space-3); color: #6B7488; font-size: 12.5px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.byline { margin: 10px 0 0; font-size: 15px; color: var(--fg-muted); letter-spacing: 0.03em; }
+.byline b { color: var(--gold); font-weight: 600; }
+
+/* ---------- 入场 ---------- */
+[data-reveal] { opacity: 0; transform: translateY(22px); transition: opacity 0.55s ease, transform 0.55s ease; }
+[data-reveal].in { opacity: 1; transform: none; }
+[data-reveal-delay="1"] { transition-delay: 0.07s; }
+[data-reveal-delay="2"] { transition-delay: 0.14s; }
+[data-reveal-delay="3"] { transition-delay: 0.21s; }
+[data-reveal-delay="4"] { transition-delay: 0.28s; }
+[data-reveal-delay="5"] { transition-delay: 0.35s; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  [data-reveal] { opacity: 1; transform: none; }
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 960px) {
+  .hero-inner { grid-template-columns: 1fr; gap: var(--space-4); }
+}
+@media (max-width: 760px) {
+  .nav-links {
+    display: none; position: absolute; top: 62px; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: rgba(9, 11, 19, 0.97); border-bottom: 1px solid var(--border-n);
+    padding: var(--space-1) 0 var(--space-2);
+  }
+  .nav-links.open { display: flex; }
+  .nav-links a { display: block; padding: 12px 6vw; }
+  .menu-btn { display: block; }
+  .nav-actions .btn-ghost { display: none; }
+  section { padding: var(--space-5) 0; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<canvas id="starfield" aria-hidden="true"></canvas>
+<div class="glow" aria-hidden="true"></div>
+
+<div class="page">
+<header class="site">
+  <div class="container nav">
+    <a class="brand" href="#top" aria-label="DNF 补丁管理器 首页">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="24" y2="24">
+            <stop offset="0" stop-color="#FDA4AF"/><stop offset="0.55" stop-color="#F43F5E"/><stop offset="1" stop-color="#F5C451"/>
+          </linearGradient>
+        </defs>
+        <path d="M12 1.5 14.6 8.2 21.5 8.6 16.2 13 18.2 19.8 12 15.9 5.8 19.8 7.8 13 2.5 8.6 9.4 8.2Z" fill="url(#lg)"/>
+      </svg>
+      <b>DNF 补丁管理器</b>
+      <span class="ver">v1.2.6</span>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="navLinks" aria-label="打开菜单">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#features">功能</a></li>
+      <li><a href="#changelog">更新</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a class="btn btn-ghost btn-sm" href="https://github.com/LingYingNX/DNFguanliqi" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .31.21.67.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
+        GitHub
+      </a>
+      <a class="btn btn-primary btn-sm" href="#top">下载</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<a id="top"></a>
+
+<!-- Hero：左文案 右 3D 截图，全站仅此一处展示界面 -->
+<section class="hero">
+  <div class="container hero-inner">
+    <div class="copy">
+      <span class="hero-badge" data-reveal><span class="dot" aria-hidden="true"></span>v1.2.6 · 2026-09</span>
+      <h1 data-reveal data-reveal-delay="1">DNF 补丁管理器</h1>
+      <p class="byline" data-reveal data-reveal-delay="1">作者 · <b>铃音奈绪</b></p>
+      <p class="sub" data-reveal data-reveal-delay="2">
+        整理本地 .npk 补丁的 Windows 桌面工具：导入扫描、树状分类、封面预览、一键启用 / 禁用。只管理你电脑上已有的文件，不下载、不分发、不修改游戏。
+      </p>
+      <div class="hero-ctas" data-reveal data-reveal-delay="3">
+        <a class="btn btn-primary" href="https://wwbox.lanzoul.com/b0j1nvnle" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+          蓝奏云下载
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/LingYingNX/DNFguanliqi/releases/latest/download/dnf-patch-manager-1.2.6-setup.exe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 20h16"/></svg>
+          GitHub 下载
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/LingYingNX/DNFguanliqi" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .31.21.67.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
+          GitHub 仓库
+        </a>
+      </div>
+      <p class="dl-hint" data-reveal data-reveal-delay="3">两个渠道为同一安装包，任选其一。蓝奏云提取码：<code>b9lx</code></p>
+      <div class="hero-meta" data-reveal data-reveal-delay="4">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/></svg>Windows 10 / 11 · x64</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>自动更新</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>免费</span>
+      </div>
+    </div>
+
+    <figure class="shot" data-reveal data-reveal-delay="2">
+      <img src="assets/screenshot.jpg" alt="DNF 补丁管理器界面：左侧树状分类中选中技能组，右侧卡片展示 .npk 补丁的封面预览、大小、日期与启用开关" width="1437" height="895" />
+    </figure>
+  </div>
+</section>
+
+<!-- 功能 -->
+<section id="features">
+  <div class="container">
+    <h2 class="sec-title" data-reveal><span class="idx">01</span>功能</h2>
+    <div class="grid">
+      <article class="card" data-reveal>
+        <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></div>
+        <h3>卡片式补丁库</h3>
+        <p>导入本地 .npk 后以封面卡片呈现，显示大小与修改日期，网格 / 列表双视图。</p>
+      </article>
+      <article class="card" data-reveal data-reveal-delay="1">
+        <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="7.5" width="19" height="9" rx="4.5"/><circle cx="8" cy="12" r="2.4"/></svg></div>
+        <h3>启用 / 禁用开关</h3>
+        <p>卡片上的开关直接控制补丁生效状态，无需手动搬移文件。</p>
+      </article>
+      <article class="card" data-reveal data-reveal-delay="2">
+        <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h5l2 3h7v13H5Z"/><path d="M9 12h7M9 16h4"/></svg></div>
+        <h3>树状分类</h3>
+        <p>按职业、buff 等维度建立文件夹树，支持子分类聚合与虚拟分组。</p>
+      </article>
+      <article class="card" data-reveal data-reveal-delay="3">
+        <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="2"/><rect x="3" y="14" width="18" height="5" rx="2"/><path d="M7 6.5h.01M7 16.5h.01"/></svg></div>
+        <h3>预设方案</h3>
+        <p>将常用补丁组合保存为预设，一键切换整套配置。</p>
+      </article>
+      <article class="card" data-reveal data-reveal-delay="4">
+        <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/><path d="M10 12v4M14 12v4"/></svg></div>
+        <h3>回收站</h3>
+        <p>误删补丁可恢复；文件操作以事务执行，中断不损坏库。</p>
+      </article>
+      <article class="card" data-reveal data-reveal-delay="5">
+        <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg></div>
+        <h3>搜索与外观</h3>
+        <p>即时搜索补丁或分组；支持调整外观与更换壁纸。</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- 更新 -->
+<section id="changelog">
+  <div class="container">
+    <h2 class="sec-title" data-reveal><span class="idx">02</span>更新</h2>
+    <div class="update-card" data-reveal data-reveal-delay="1">
+      <div class="update-head">
+        <span class="v">v1.2.6</span>
+        <span class="tag">当前版本</span>
+        <span class="date">2026-09</span>
+      </div>
+      <ul class="update-list">
+        <li>优化文件夹重命名交互与选中样式</li>
+        <li>树状导航细节：竖线对准展开箭头、右键菜单收边</li>
+        <li>修复文件夹排序锁定问题</li>
+        <li>新增应用内更新说明与反馈入口</li>
+      </ul>
+      <div class="update-foot">
+        <p>安装后自动检测新版本。</p>
+        <a class="btn btn-ghost btn-sm" href="https://github.com/LingYingNX/DNFguanliqi/releases" target="_blank" rel="noopener noreferrer">
+          全部版本
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site">
+  <div class="container">
+    <div class="foot-flex">
+      <a class="brand" href="#top">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 1.5 14.6 8.2 21.5 8.6 16.2 13 18.2 19.8 12 15.9 5.8 19.8 7.8 13 2.5 8.6 9.4 8.2Z" fill="url(#lg)"/>
+        </svg>
+        <b>DNF 补丁管理器</b>
+      </a>
+      <nav class="foot-links" aria-label="页脚链接">
+        <a href="#features">功能</a>
+        <a href="#changelog">更新</a>
+        <a href="https://wwbox.lanzoul.com/b0j1nvnle" target="_blank" rel="noopener noreferrer">蓝奏云下载</a>
+        <a href="https://github.com/LingYingNX/DNFguanliqi/releases/latest/download/dnf-patch-manager-1.2.6-setup.exe">GitHub 下载</a>
+        <a href="https://github.com/LingYingNX/DNFguanliqi" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/LingYingNX/DNFguanliqi/issues" target="_blank" rel="noopener noreferrer">反馈</a>
+      </nav>
+    </div>
+    <div class="foot-bottom">
+      <span>© <span id="year">2026</span> 铃音奈绪</span>
+      <span>第三方独立工具，与游戏官方无关联。</span>
+    </div>
+  </div>
+</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---- 星空：白 / 暖金 / 浅玫三色星 ---- */
+  var canvas = document.getElementById("starfield");
+  var ctx = canvas.getContext("2d");
+  var stars = [], shooters = [], W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var count = Math.round((W * H) / 5600);
+    stars = [];
+    for (var i = 0; i < count; i++) {
+      var roll = Math.random();
+      stars.push({
+        x: Math.random() * W, y: Math.random() * H,
+        r: Math.random() * 1.25 + 0.3,
+        a: Math.random() * 0.5 + 0.22,
+        sp: Math.random() * 1.5 + 0.4,
+        ph: Math.random() * Math.PI * 2,
+        vx: -(Math.random() * 0.04 + 0.008),
+        vy: Math.random() * 0.015 + 0.004,
+        hue: roll < 0.10 ? "245,196,81" : (roll < 0.20 ? "253,164,175" : "232,234,242")
+      });
+    }
+  }
+
+  function drawStatic() {
+    ctx.clearRect(0, 0, W, H);
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(" + s.hue + "," + s.a + ")";
+      ctx.fill();
+    }
+  }
+
+  function spawnShooter() {
+    shooters.push({
+      x: W * (0.55 + Math.random() * 0.4),
+      y: H * Math.random() * 0.35,
+      len: 80 + Math.random() * 60,
+      sp: 8 + Math.random() * 5,
+      life: 1
+    });
+  }
+
+  var last = 0, nextShooter = 5000;
+  function tick(t) {
+    var dt = Math.min(t - last, 50); last = t;
+    ctx.clearRect(0, 0, W, H);
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var tw = s.a * (0.55 + 0.45 * Math.sin(t / 1000 * s.sp + s.ph));
+      s.x += s.vx * dt * 0.06; s.y += s.vy * dt * 0.06;
+      if (s.x < -2) s.x = W + 2; if (s.y > H + 2) s.y = -2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(" + s.hue + "," + tw.toFixed(3) + ")";
+      ctx.fill();
+    }
+    nextShooter -= dt;
+    if (nextShooter <= 0) { spawnShooter(); nextShooter = 5000 + Math.random() * 7000; }
+    for (var j = shooters.length - 1; j >= 0; j--) {
+      var sh = shooters[j];
+      sh.x -= sh.sp * dt * 0.06 * 1.6; sh.y += sh.sp * dt * 0.06 * 0.7;
+      sh.life -= dt / 900;
+      if (sh.life <= 0) { shooters.splice(j, 1); continue; }
+      var gx = sh.x + sh.len * 0.8, gy = sh.y - sh.len * 0.35;
+      var grad = ctx.createLinearGradient(sh.x, sh.y, gx, gy);
+      grad.addColorStop(0, "rgba(232,234,242," + (0.8 * sh.life).toFixed(3) + ")");
+      grad.addColorStop(1, "rgba(253,164,175,0)");
+      ctx.strokeStyle = grad; ctx.lineWidth = 1.5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(gx, gy); ctx.stroke();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  resize();
+  window.addEventListener("resize", function () { resize(); if (reduceMotion) drawStatic(); });
+  if (reduceMotion) drawStatic(); else requestAnimationFrame(tick);
+
+  /* ---- 滚动入场 ---- */
+  var els = document.querySelectorAll("[data-reveal]");
+  if ("IntersectionObserver" in window && !reduceMotion) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    els.forEach(function (el) { io.observe(el); });
+  } else {
+    els.forEach(function (el) { el.classList.add("in"); });
+  }
+
+  /* ---- 移动端菜单 ---- */
+  var btn = document.getElementById("menuBtn");
+  var links = document.getElementById("navLinks");
+  btn.addEventListener("click", function () {
+    var open = links.classList.toggle("open");
+    btn.setAttribute("aria-expanded", String(open));
+    btn.setAttribute("aria-label", open ? "关闭菜单" : "打开菜单");
+  });
+  links.addEventListener("click", function (e) {
+    if (e.target.tagName === "A") { links.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); }
+  });
+
+  document.getElementById("year").textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>
