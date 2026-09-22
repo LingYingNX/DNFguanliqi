@@ -15,7 +15,8 @@
       "!.superpowers",
       "!.agents",
       "!data",
-      "!patch-categories"
+      "!patch-categories",
+      "!website"
     ]
   },
   "assist": {
