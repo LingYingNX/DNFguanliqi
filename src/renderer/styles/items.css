@@ -31,6 +31,8 @@
   transition:
     border-color var(--motion-standard) var(--easing-standard),
     background-color var(--motion-standard) var(--easing-standard),
+    /* 悬停/选中/拖拽落点都靠 box-shadow 变化，必须列入过渡，否则阴影瞬间跳变。 */
+    box-shadow var(--motion-standard) var(--easing-standard),
     transform var(--motion-fast) var(--easing-standard);
 }
 
@@ -56,6 +58,11 @@
 .item-card-shell:hover > .item-card {
   border-color: var(--color-primary);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+/* 按下反馈：卡片是最高频的点击目标（数十次/天），故用近乎不可察觉的 0.98。 */
+.item-card:active {
+  transform: scale(0.98);
 }
 
 .item-card[aria-pressed="true"] {
@@ -294,6 +301,18 @@
 .item-context-menu.card {
   position: fixed;
   z-index: 120;
+  /* 从光标处"生长"出来，而不是凭空闪现。transform-origin 由内联样式按
+     实际落点（可能翻转/收边）设置，故此处不写死。 */
+  transition:
+    opacity var(--motion-standard) var(--easing-standard),
+    transform var(--motion-standard) var(--easing-standard);
+}
+
+@starting-style {
+  .item-context-menu.card {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 
 .item-context-submenu-panel.card {
@@ -301,6 +320,18 @@
   z-index: 1;
   top: -15px;
   left: 100%;
+  /* 子菜单从父项右侧展开，原点贴左边缘。 */
+  transform-origin: left center;
+  transition:
+    opacity var(--motion-fast) var(--easing-standard),
+    transform var(--motion-fast) var(--easing-standard);
+}
+
+@starting-style {
+  .item-context-submenu-panel.card {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 
 .item-context-menu-list.list {

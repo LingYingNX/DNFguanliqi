@@ -60,7 +60,9 @@
   transition:
     color var(--motion-standard) var(--easing-standard),
     background-color var(--motion-standard) var(--easing-standard),
-    border-color var(--motion-standard) var(--easing-standard);
+    border-color var(--motion-standard) var(--easing-standard),
+    /* 选中态用 box-shadow 画光晕，不列入过渡会瞬间跳变。 */
+    box-shadow var(--motion-standard) var(--easing-standard);
 }
 
 .settings-nav-item:hover,

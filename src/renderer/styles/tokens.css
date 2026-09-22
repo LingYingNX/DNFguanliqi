@@ -147,7 +147,11 @@ input:focus-visible {
   *::after {
     scroll-behavior: auto;
     transition-duration: 0.001ms;
+    /* 只压缩 duration 不够：延迟仍会保留，更新提示的 4500ms 延迟会让元素
+       在减弱动效模式下依旧悬着不动，观感等同"卡住"。 */
+    transition-delay: 0.001ms;
     animation-duration: 0.001ms;
+    animation-delay: 0.001ms;
     animation-iteration-count: 1;
   }
 }

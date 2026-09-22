@@ -104,7 +104,8 @@
   text-align: left;
   transition:
     box-shadow var(--motion-fast) var(--easing-standard),
-    background-color var(--motion-fast) var(--easing-standard);
+    background-color var(--motion-fast) var(--easing-standard),
+    color var(--motion-fast) var(--easing-standard);
 }
 
 .category-node-line {
@@ -388,6 +389,18 @@
   border: 1px solid var(--color-border-strong);
   border-radius: 5px;
   background: #15171d;
+  /* 与卡片右键菜单一致的入场：从光标处生长。 */
+  transform-origin: top left;
+  transition:
+    opacity var(--motion-standard) var(--easing-standard),
+    transform var(--motion-standard) var(--easing-standard);
+}
+
+@starting-style {
+  .category-context-menu {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 
 .category-context-action {
