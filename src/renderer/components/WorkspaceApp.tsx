@@ -343,7 +343,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
       />
       {settingsOpen ? (
         <SettingsDialog
-          currentVersion={client?.appInfo.version ?? "1.2.6"}
+          currentVersion={client?.appInfo.version ?? "1.2.7"}
           gameDirectory={gameDirectory.gameDirectory}
           gameDirectoryBusy={
             gameDirectory.loading || gameDirectory.selecting || gameDirectory.saving
