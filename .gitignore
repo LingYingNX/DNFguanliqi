@@ -15,6 +15,8 @@ Desktop.ini
 .superpowers/
 .superdesign/tmp/
 .omo/
+# 官网工作副本：部署源是 gh-pages 孤儿分支，本地这份不进入 master。
+website/
 build/icon.png
 *91489374.png
 *.log
