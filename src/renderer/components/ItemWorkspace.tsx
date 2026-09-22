@@ -76,6 +76,7 @@ type ItemWorkspaceProps = {
   readonly onRecycle: () => void;
   readonly onRenameItem: (item: WorkspaceItem, newName: string) => Promise<boolean>;
   readonly onSetItemEnabled: (item: WorkspaceItem, enabled: boolean) => void;
+  readonly onSetItemsEnabled: (items: readonly WorkspaceItem[], enabled: boolean) => void;
   readonly onSelectPreview: (item: WorkspaceItem) => void;
   readonly onSelect: (relativePath: string, modifiers: SelectionModifiers) => void;
   readonly selectedPaths: readonly string[];
@@ -782,8 +783,20 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
                     disabled={
                       props.readOnly || props.busyItemKeys.has(itemKey) || props.operationBusy
                     }
-                    onChange={(event) => props.onSetItemEnabled(item, event.currentTarget.checked)}
-                    onClick={(event) => event.stopPropagation()}
+                    onChange={(event) => {
+                      const enabled = event.currentTarget.checked;
+                      // 多选时开关作用于整个选区，与 Windows 里批量勾选一致；
+                      // 未选中或只选一张时仍是单卡片行为。
+                      if (selected && props.selectedItems.length > 1) {
+                        props.onSetItemsEnabled(props.selectedItems, enabled);
+                        return;
+                      }
+                      props.onSetItemEnabled(item, enabled);
+                    }}
+                    onClick={(event) => {
+                      // 阻止冒泡，否则点击开关会先把选区收窄成这一张卡片。
+                      event.stopPropagation();
+                    }}
                     onDoubleClick={(event) => event.stopPropagation()}
                     onPointerDown={(event) => event.stopPropagation()}
                     type="checkbox"

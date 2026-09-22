@@ -105,6 +105,70 @@ describe("workspace operations", () => {
     expect(labels).toEqual(["移动", "打组", "加入预设", "重命名", "源文件", "删除"]);
   });
 
+  it("enables every selected patch when one selected card switch is turned on", async () => {
+    let enabledRequest: Parameters<DnfApi["enableItems"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      enableItems: async (request) => {
+        enabledRequest = request;
+        return { ok: true, value: { installedCount: request.items.length } };
+      },
+    };
+    render(<App api={api} />);
+    await screen.findByText("coat.npk");
+    // coat.npk 已启用、sword.npk 未启用，两条一起选中后拨任一开关。
+    fireEvent.click(itemButton("coat.npk"));
+    fireEvent.click(itemButton("sword.npk"), { ctrlKey: true });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "启用 sword.npk" }));
+
+    // 已启用的 coat.npk 不进请求，只有真正需要变更的 sword.npk 被提交。
+    await waitFor(() =>
+      expect(enabledRequest).toEqual({ items: [{ kind: "patch", relativePath: "sword.npk" }] }),
+    );
+  });
+
+  it("disables every selected patch when one selected card switch is turned off", async () => {
+    let disabledRequest: Parameters<DnfApi["disableItems"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      disableItems: async (request) => {
+        disabledRequest = request;
+        return { ok: true, value: { removedCount: request.items.length } };
+      },
+    };
+    render(<App api={api} />);
+    await screen.findByText("coat.npk");
+    fireEvent.click(itemButton("coat.npk"));
+    fireEvent.click(itemButton("sword.npk"), { ctrlKey: true });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "停用 coat.npk" }));
+
+    await waitFor(() =>
+      expect(disabledRequest).toEqual({ items: [{ kind: "patch", relativePath: "coat.npk" }] }),
+    );
+  });
+
+  it("keeps a single card switch to that card when nothing is selected", async () => {
+    let enabledRequest: Parameters<DnfApi["enableItems"]>[0] | undefined;
+    const api: DnfApi = {
+      ...createFakeApi(WORKSPACE_SNAPSHOT),
+      enableItems: async (request) => {
+        enabledRequest = request;
+        return { ok: true, value: { installedCount: request.items.length } };
+      },
+    };
+    render(<App api={api} />);
+    await screen.findByText("coat.npk");
+
+    // 未选中任何卡片时拨开关，只应影响这一张，且不因此改变选中态。
+    fireEvent.click(screen.getByRole("checkbox", { name: "启用 sword.npk" }));
+
+    await waitFor(() =>
+      expect(enabledRequest).toEqual({ items: [{ kind: "patch", relativePath: "sword.npk" }] }),
+    );
+  });
+
   it("opens the selected patch source file from its context menu", async () => {
     const requests: Array<{ readonly relativePath: string }> = [];
     const api = {

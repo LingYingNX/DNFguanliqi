@@ -69,12 +69,13 @@ export function useWorkspaceOperations({
       const request = {
         items: itemsToChange.map(installReference),
       };
-      if (enabled) {
-        const result = await api.enableItems(request);
-        return result.ok ? finish() : reportFailure(result.error.message);
+      const result = enabled ? await api.enableItems(request) : await api.disableItems(request);
+      if (!result.ok) {
+        return reportFailure(result.error.message);
       }
-      const result = await api.disableItems(request);
-      return result.ok ? finish() : reportFailure(result.error.message);
+      // 开关不清空选区：批量启用/停用后仍要保持多选，才能接着整体关回去。
+      // 其余批量操作（移动、回收）用 finish()，那类操作完成后选区本就该失效。
+      return refresh();
     } catch (error) {
       if (error instanceof Error) {
         return reportFailure(`${enabled ? "启用" : "停用"}失败，磁盘内容未被修改。`);

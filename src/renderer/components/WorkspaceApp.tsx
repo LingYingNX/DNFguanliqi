@@ -247,6 +247,18 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
             });
           });
         }}
+        onSetItemsEnabled={(items, enabled) => {
+          // 批量入口标记全部涉及条目，同样不动全局 busy。
+          const itemKeys = items.map(workspaceItemKey);
+          setBusyItemKeys((current) => new Set([...current, ...itemKeys]));
+          void operations.setEnabledFor(items, enabled).finally(() => {
+            setBusyItemKeys((current) => {
+              const next = new Set(current);
+              for (const key of itemKeys) next.delete(key);
+              return next;
+            });
+          });
+        }}
         readOnly={recovery.readOnly}
         showDescendantToggle={navigation.kind !== "uncategorized" && navigation.kind !== "group"}
         visibleItems={workspace.visibleItems}
