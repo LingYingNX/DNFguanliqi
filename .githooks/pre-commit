@@ -1,8 +1,13 @@
 #!/usr/bin/env sh
 set -eu
 
+# --level=3 --staged：本地必须在提交前就拦住 drift（改了 package.json /
+# .github/workflows/* / scripts/* 却没同步 AGENTS.md）。此前只跑 --level=1，
+# drift 属 level 3，于是同一类疏漏连续两次漏到 CI 才报红。
+# --staged 让检查看暂存区而不是上一个提交——pre-commit 阶段 HEAD~1..HEAD
+# 仍指向旧提交，查它既拦不住本次改动、也可能误报。
 if command -v bash >/dev/null 2>&1 && [ -f scripts/verify-harness.sh ]; then
-  bash scripts/verify-harness.sh --level=1 --format=text
+  bash scripts/verify-harness.sh --level=3 --staged --format=text
 fi
 
 # 阻止重新引入重复的路径/状态辅助实现（规则见 src/AGENTS.md）。

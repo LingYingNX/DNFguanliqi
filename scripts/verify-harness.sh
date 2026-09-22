@@ -12,6 +12,7 @@ WARNINGS=0
 FORMAT=""
 MAX_LEVEL=3
 SINGLE_CHECK=""
+STAGED=false
 STATUS_ONLY=false
 PLATFORM="${PLATFORM:-}"
 
@@ -45,6 +46,9 @@ Options:
                     from CI environment or git remote URL if not specified)
   --level=N         Only check up to level N (1, 2, or 3; default: all)
   --check=NAME      Run single check category: refs, commands, drift, structure
+  --staged          Check the staged diff instead of the last commit.
+                    Used by the pre-commit hook so drift is caught before the
+                    commit exists (HEAD~1..HEAD would look at the wrong diff).
   --status          Show current maturity level summary only
   --help            Show this help message
 
@@ -512,13 +516,26 @@ check_drift() {
         return
     fi
 
-    # Skip if no parent commit (initial commit)
-    if ! git rev-parse HEAD~1 &>/dev/null 2>&1; then
-        pass 3 "Drift check skipped (no parent commit)"
-        return
+    # Which diff to inspect: the staged changes (pre-commit) or the last commit (CI).
+    # pre-commit must look at the staged diff — HEAD~1..HEAD there still points at
+    # the previous commit, so drift in the commit being created would slip through.
+    local diff_range
+    if [[ "$STAGED" == true ]]; then
+        if ! git rev-parse HEAD &>/dev/null 2>&1; then
+            pass 3 "Drift check skipped (no commit yet)"
+            return
+        fi
+        diff_range="--cached"
+    else
+        # Skip if no parent commit (initial commit)
+        if ! git rev-parse HEAD~1 &>/dev/null 2>&1; then
+            pass 3 "Drift check skipped (no parent commit)"
+            return
+        fi
+        diff_range="HEAD~1 HEAD"
     fi
 
-    # Check if build/CI files changed in last commit.
+    # Check if build/CI files changed in the inspected diff.
     # Directories with build/CI changes are collected, not just the last one:
     # a commit may touch both a workflow and a harness script, and coverage
     # must be evaluated per directory.
@@ -543,7 +560,7 @@ check_drift() {
                 changed_dirs["scripts"]=1
                 ;;
         esac
-    done < <(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
+    done < <(git diff --name-only $diff_range 2>/dev/null || true)
 
     # A scoped AGENTS.md in the touched directory (or an ancestor of it) also
     # counts: scoped files are what carry directory-specific CI rules. Each
@@ -560,11 +577,15 @@ check_drift() {
                     break 2
                 fi
             done
-        done < <(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '(^|/)AGENTS\.md$' || true)
+        done < <(git diff --name-only $diff_range 2>/dev/null | grep -E '(^|/)AGENTS\.md$' || true)
     fi
 
     if [[ "$build_files_changed" == true && "$agents_changed" == false ]]; then
-        warn 3 "Potential drift: build/CI files changed in last commit but no AGENTS.md (root or matching scope) was updated"
+        if [[ "$STAGED" == true ]]; then
+            warn 3 "Potential drift: staged build/CI files changed but no AGENTS.md (root or matching scope) updated"
+        else
+            warn 3 "Potential drift: build/CI files changed in last commit but no AGENTS.md (root or matching scope) was updated"
+        fi
     else
         pass 3 "No drift detected"
     fi
@@ -729,6 +750,9 @@ main() {
                 ;;
             --check=*)
                 SINGLE_CHECK="${1#--check=}"
+                ;;
+            --staged)
+                STAGED=true
                 ;;
             --status)
                 STATUS_ONLY=true
