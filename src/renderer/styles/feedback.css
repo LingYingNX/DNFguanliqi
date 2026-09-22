@@ -19,10 +19,19 @@
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.46);
   font-size: 13px;
   line-height: 1.4;
-  animation: toast-in 160ms ease-out;
+  /* 进出场统一用 transition（而非入场 keyframes + 退场 transition）：transition 能被
+     快速连续触发平滑重定向，keyframes 会从头重播造成跳变。退场 320ms 略慢于入场，
+     让用户看清提示内容。 */
   transition:
     opacity 320ms ease,
     transform 320ms ease;
+}
+
+@starting-style {
+  .toast {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .toast[data-leaving="true"] {
@@ -46,17 +55,6 @@
 .toast-close:hover {
   color: var(--color-text-primary);
   background: color-mix(in srgb, var(--color-border-strong) 36%, transparent);
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .toast[data-tone="success"] svg {

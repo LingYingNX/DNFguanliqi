@@ -128,7 +128,12 @@ export function ContextMenu({
   y,
 }: ContextMenuProps): React.JSX.Element {
   const [openPath, setOpenPath] = useState<readonly number[]>([]);
-  const [placement, setPlacement] = useState<{ left: number; top: number }>({ left: x, top: y });
+  const [placement, setPlacement] = useState<{
+    left: number;
+    originX: string;
+    originY: string;
+    top: number;
+  }>({ left: x, originX: "left", originY: "top", top: y });
   const menuRef = useRef<HTMLDivElement | null>(null);
   const openMenuPath = (path: readonly number[]): void => {
     setOpenPath((current) => (pathsEqual(current, path) ? current : path));
@@ -136,19 +141,26 @@ export function ContextMenu({
 
   // 菜单固定定位在光标处，滚动无法把它带回视口；向下放不下时改为向上展开，
   // 向右放不下时向左收边，避免贴着窗口下缘/右缘右键时菜单被裁掉。
+  // transform-origin 同步指向光标所在角，入场缩放才会"从点击处生长"。
   useLayoutEffect(() => {
     const node = menuRef.current;
     if (node === null) return;
     const { width, height } = node.getBoundingClientRect();
     if (width === 0 || height === 0) return;
-    const left =
-      x + width + VIEWPORT_MARGIN > window.innerWidth
-        ? Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN)
-        : x;
-    const top =
-      y + height + VIEWPORT_MARGIN > window.innerHeight ? Math.max(VIEWPORT_MARGIN, y - height) : y;
+    const flipsLeft = x + width + VIEWPORT_MARGIN > window.innerWidth;
+    const flipsUp = y + height + VIEWPORT_MARGIN > window.innerHeight;
+    const left = flipsLeft
+      ? Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN)
+      : x;
+    const top = flipsUp ? Math.max(VIEWPORT_MARGIN, y - height) : y;
+    const next = {
+      left,
+      originX: flipsLeft ? "right" : "left",
+      originY: flipsUp ? "bottom" : "top",
+      top,
+    };
     setPlacement((current) =>
-      current.left === left && current.top === top ? current : { left, top },
+      current.left === next.left && current.top === next.top ? current : next,
     );
   }, [x, y]);
 
@@ -185,7 +197,11 @@ export function ContextMenu({
       className={`item-context-menu card${className === undefined ? "" : ` ${className}`}`}
       onContextMenu={(event) => event.preventDefault()}
       role="menu"
-      style={{ left: placement.left, top: placement.top }}
+      style={{
+        left: placement.left,
+        top: placement.top,
+        transformOrigin: `${placement.originY} ${placement.originX}`,
+      }}
     >
       <MenuList
         actions={actions}

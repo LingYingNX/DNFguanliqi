@@ -315,6 +315,14 @@
   background: transparent;
   cursor: pointer;
   place-items: center;
+  transition:
+    color var(--motion-fast) var(--easing-standard),
+    background-color var(--motion-fast) var(--easing-standard);
+}
+
+.view-mode-control button:hover:not([aria-pressed="true"]) {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-elevated) 64%, transparent);
 }
 
 .view-mode-control button[aria-pressed="true"] {

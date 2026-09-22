@@ -27,6 +27,13 @@
   place-items: center;
   padding: var(--space-6);
   background: rgba(3, 4, 7, 0.76);
+  transition: opacity 200ms var(--easing-standard);
+}
+
+@starting-style {
+  .dialog-backdrop {
+    opacity: 0;
+  }
 }
 
 .dialog-backdrop-dismiss {
@@ -50,6 +57,17 @@
   border-radius: var(--radius-panel);
   background: var(--color-surface);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.42);
+  /* 对话框居中显示，故不需要 transform-origin（原点即中心）。 */
+  transition:
+    opacity 200ms var(--easing-standard),
+    transform 200ms var(--easing-standard);
+}
+
+@starting-style {
+  .dialog-panel {
+    opacity: 0;
+    transform: scale(0.97);
+  }
 }
 
 .dialog-heading,
