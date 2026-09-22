@@ -32,8 +32,7 @@
     border-color var(--motion-standard) var(--easing-standard),
     background-color var(--motion-standard) var(--easing-standard),
     /* 悬停/选中/拖拽落点都靠 box-shadow 变化，必须列入过渡，否则阴影瞬间跳变。 */
-    box-shadow var(--motion-standard) var(--easing-standard),
-    transform var(--motion-fast) var(--easing-standard);
+    box-shadow var(--motion-standard) var(--easing-standard);
 }
 
 .item-card-shell {
@@ -58,11 +57,6 @@
 .item-card-shell:hover > .item-card {
   border-color: var(--color-primary);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
-}
-
-/* 按下反馈：卡片是最高频的点击目标（数十次/天），故用近乎不可察觉的 0.98。 */
-.item-card:active {
-  transform: scale(0.98);
 }
 
 .item-card[aria-pressed="true"] {
