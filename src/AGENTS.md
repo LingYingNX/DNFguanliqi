@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-09-16 -->
+<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-09-26 -->
 
 # AGENTS.md — src
 
@@ -68,6 +68,7 @@ pnpm build
 
 - 改 `src/shared/contracts.ts` 的 `APP_VERSION` 时，必须同步 `package.json` 版本与 Git 标签。
 - 外观相关 CSS 变量由 `src/renderer/workspace/useAppearance.ts` 统一写入，不要在组件里另起变量名。
+- 分类排序：`scanCategory` / `scanCategoryTree` 的 `savedOrders` 是显示顺序的唯一输入。改名、新建或固化同级顺序前必须传入 `categoryOrder.getAll()` 的结果；未记录的分类会回落到 `byName`，不能只改顺序记录而不迁移或固化。回归测试要覆盖“从未排序过”和“陈旧且不完整记录”两类场景（见 ERR-20260920-004 / ERR-20260920-005）。
 
 ## 禁止重复造路径/状态辅助（简化前必读）
 

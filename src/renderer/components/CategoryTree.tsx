@@ -246,6 +246,7 @@ export function CategoryTree({
                       ? dropTarget.position
                       : undefined
                   }
+                  title={category.name}
                   onClick={() => onSelect(category.relativePath)}
                   onContextMenu={(event) => {
                     event.preventDefault();

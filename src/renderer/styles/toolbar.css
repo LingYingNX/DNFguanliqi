@@ -296,36 +296,43 @@
 
 .view-mode-control {
   display: flex;
-  height: var(--control-height);
+  height: 2.7em;
   align-items: center;
+  gap: 2px;
+  margin-top: calc((var(--control-height) - 2.7em) / 2);
   padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
+  border: none;
+  border-radius: 4px;
+  background: #000000;
+  transform: translateX(-4px);
 }
 
 .view-mode-control button {
   display: grid;
-  width: 30px;
-  height: 100%;
+  width: 34px;
+  height: 2.7em;
   padding: 0;
   border: 0;
-  color: var(--color-text-secondary);
+  border-radius: 4px;
+  color: #ffffff;
   background: transparent;
   cursor: pointer;
   place-items: center;
   transition:
-    color var(--motion-fast) var(--easing-standard),
-    background-color var(--motion-fast) var(--easing-standard);
+    color 0.5s ease,
+    background-color 0.5s ease;
 }
 
 .view-mode-control button:hover:not([aria-pressed="true"]) {
-  color: var(--color-text-primary);
-  background: color-mix(in srgb, var(--color-elevated) 64%, transparent);
+  color: #ffffff;
+  background: #000000;
 }
 
 .view-mode-control button[aria-pressed="true"] {
-  color: var(--color-primary);
-  background: var(--color-elevated);
+  color: #ffffff;
+  background: #000000;
+}
+
+.view-mode-control button:active {
+  background: rgb(49, 228, 255);
 }

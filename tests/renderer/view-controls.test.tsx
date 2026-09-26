@@ -35,7 +35,7 @@ describe("workspace view controls", () => {
     expect(screen.queryByRole("columnheader", { name: "类型" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "大小 / 数量" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "日期" })).not.toBeInTheDocument();
-    expect(listCard).toHaveTextContent("补丁");
+    expect(listCard.querySelector(".item-type")).toBeNull();
     expect(listCard).toHaveTextContent("2026");
     expect(listCard.querySelector(".status-badge")).toBeNull();
     expect(screen.queryByText(/个项目/u)).not.toBeInTheDocument();

@@ -29,15 +29,15 @@ describe("patch search field contract", () => {
 
     expect(block).toContain("max-width: 320px;");
     expect(block).toContain("flex: 0 1 320px;");
-    expect(block).toContain(
-      "background-color: color-mix(in srgb, var(--color-surface) 62%, transparent);",
-    );
-    expect(block).not.toContain("#1a1b23");
-    expect(block).toContain("border-radius: 2px;");
+    expect(block).toContain("height: 2.7em;");
+    expect(block).toContain("background-color: #000000;");
+    expect(block).toContain("border-radius: 4px;");
     expect(stylesheet).toContain(".workspace-search-field:focus-within");
-    expect(stylesheet).toContain("border-color: var(--color-primary);");
-    expect(stylesheet).toContain("box-shadow: 0 0 0 3px var(--color-focus);");
-    expect(stylesheet).not.toContain("rgba(0, 255, 153, 0.35)");
+    expect(stylesheet).toContain("color: rgb(133, 198, 255);");
+    expect(stylesheet).toContain(".workspace-search-field:focus-within .todo-line");
+    expect(stylesheet).toContain("animation: workspace-search-line-draw 0.3s ease-in forwards;");
+    expect(stylesheet).toContain("background: rgb(49, 228, 255);");
+    expect(stylesheet).toContain("@keyframes workspace-search-line-draw");
   });
 
   it("does not ship development overlay dependencies or entry-point injection", () => {

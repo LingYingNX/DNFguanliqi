@@ -15,6 +15,48 @@
   border-right: 1px solid var(--color-border);
 }
 
+.sidebar-resize-handle {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--sidebar-width) - 5px);
+  width: 10px;
+  margin: 0;
+  border: 0;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.sidebar-resize-handle::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+  content: "";
+  transition:
+    background-color var(--motion-fast) var(--easing-standard),
+    width var(--motion-fast) var(--easing-standard);
+}
+
+.sidebar-resize-handle:hover::before,
+.sidebar-resize-handle[data-dragging="true"]::before,
+.sidebar-resize-handle:focus-visible::before {
+  background: var(--color-primary-hover);
+}
+
+.sidebar-resize-handle[data-dragging="true"]::before {
+  width: 2px;
+}
+
+.sidebar-resize-handle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
 .sidebar-system-nav {
   display: grid;
   gap: 2px;
@@ -289,6 +331,25 @@
   bottom: 0;
 }
 
+/* 树下方的根级落点：拖拽嵌套文件夹时提供一块高命中率的“移出到根目录”区域，
+   指示线与行间插入保持一致。 */
+.category-root-drop {
+  position: relative;
+  min-height: 72px;
+  margin-top: 2px;
+}
+
+.category-root-drop.active::before {
+  position: absolute;
+  top: 0;
+  right: 14px;
+  left: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  content: "";
+}
+
 .category-count {
   width: 38px;
   flex: 0 0 38px;
@@ -386,24 +447,60 @@
   max-height: calc(100vh - 16px);
   overflow-y: auto;
   padding: 4px;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid rgb(255 255 255 / 9%);
   border-radius: 5px;
-  background: #15171d;
-  /* 与卡片右键菜单一致的入场：从光标处生长。 */
+  background: rgb(20 24 35 / 90%);
+  box-shadow:
+    0 18px 36px -6px rgb(0 0 0 / 65%),
+    0 6px 14px -2px rgb(0 0 0 / 45%),
+    inset 0 1px 0 0 rgb(255 255 255 / 12%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
   transform-origin: top left;
   transition:
-    opacity var(--motion-standard) var(--easing-standard),
-    transform var(--motion-standard) var(--easing-standard);
+    opacity 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @starting-style {
   .category-context-menu {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.95) translateY(-2px);
   }
 }
 
+.category-context-pill {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 10%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    top 110ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    left 110ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 110ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 110ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 90ms ease,
+    background-color 90ms ease;
+}
+
+.category-context-pill[data-danger="true"] {
+  background: rgb(244 63 94 / 20%);
+}
+
+.category-context-actions {
+  position: relative;
+  z-index: 1;
+}
+
 .category-context-action {
+  position: relative;
+  z-index: 1;
   display: flex;
   width: 100%;
   height: 37px;
@@ -412,21 +509,31 @@
   padding: 0 10px;
   border: 0;
   border-radius: 5px;
-  color: var(--color-text-primary);
+  color: #cbd5e1;
   background: transparent;
   cursor: pointer;
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
   text-align: left;
+  transition: color 90ms ease;
 }
 
 .category-context-action:hover:not(:disabled) {
-  background: #20232c;
+  color: #ffffff;
+}
+
+:where(.category-context-action:hover:not(:disabled)) svg {
+  color: #a5b4fc;
 }
 
 .category-context-delete {
   flex: 0 0 37px;
-  color: var(--color-danger);
+  color: #fb7185;
+}
+
+.category-context-delete:hover:not(:disabled) {
+  color: #fda4af;
 }
 
 .category-context-action:disabled,
@@ -436,12 +543,16 @@
 }
 
 .category-context-divider {
+  position: relative;
+  z-index: 1;
   height: 1px;
-  margin: 4px 0;
-  background: var(--color-border);
+  margin: 4px;
+  background: rgb(255 255 255 / 8%);
 }
 
 .category-style-options {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(5, 36px) 1fr;
   gap: 0;
@@ -455,7 +566,7 @@
   height: 36px;
   place-items: center;
   border: 0;
-  border-radius: 0;
+  border-radius: 5px;
   background: transparent;
   cursor: pointer;
 }
@@ -465,7 +576,7 @@
 }
 
 .category-style-option.selected {
-  background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  background: rgb(255 255 255 / 10%);
 }
 
 .category-style-preview {
@@ -481,6 +592,8 @@
 }
 
 .category-color-picker {
+  position: relative;
+  z-index: 1;
   display: block;
   padding: 7px 3px 3px;
 }
@@ -777,69 +890,108 @@
 }
 
 .workspace-search-field {
+  position: relative;
   width: min(320px, 100%);
   max-width: 320px;
   flex: 0 1 320px;
   min-width: 0;
+  height: 2.7em;
+  /* 新增的视觉高度外扩时仍以标准控件中心线对齐。 */
+  margin-top: calc((var(--control-height) - 2.7em) / 2);
   margin-left: 0;
-  padding: 0.5rem 1rem;
-  border: 1px solid #2a2b33;
-  border-radius: 2px;
-  background-color: color-mix(in srgb, var(--color-surface) 62%, transparent);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 0 1em;
+  border: none;
+  border-radius: 4px;
+  background-color: #000000;
+  box-shadow: none;
   transition:
-    background-color 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
+    background-color 0.5s ease,
+    color 0.5s ease;
 }
 
 .workspace-search-field:hover {
-  background-color: color-mix(in srgb, var(--color-elevated) 62%, transparent);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+  background-color: #000000;
+  box-shadow: none;
 }
 
 .workspace-search-field:focus-within {
-  border-color: var(--color-primary);
-  background-color: color-mix(in srgb, var(--color-elevated) 72%, transparent);
-  box-shadow: 0 0 0 3px var(--color-focus);
+  background-color: #000000;
+  box-shadow: none;
 }
 
 .workspace-search-field > svg {
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
-  color: #8a8a8a;
-  transition: color 0.2s ease;
+  color: rgb(133, 198, 255);
+  transition: color 0.5s ease;
 }
 
 .workspace-search-field:focus-within > svg {
-  color: var(--color-primary);
+  color: rgb(133, 198, 255);
 }
 
-.workspace-search-input {
+.workspace-search-field .workspace-search-input {
+  display: block;
   flex: 1;
   min-width: 0;
-  padding: 0.5rem 0;
-  border: 0;
+  height: 2.7em;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
   outline: none;
-  color: #f0f0f0;
-  background: none;
+  color: rgb(133, 198, 255);
+  background-color: transparent;
   font-size: 1rem;
-  font-family: inherit;
+  font-family: "Instrument Sans", "Microsoft YaHei", sans-serif;
 }
 
-.workspace-search-input:focus {
+.workspace-search-field .workspace-search-input:focus {
   box-shadow: none;
 }
 
-.workspace-search-input::placeholder {
-  color: #8a8a8a;
+.workspace-search-field .workspace-search-input::placeholder {
+  color: rgb(133 198 255 / 52%);
   opacity: 1;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.3s ease;
 }
 
-.workspace-search-input:focus::placeholder {
-  opacity: 0.5;
+.workspace-search-field .workspace-search-input:focus::placeholder {
+  opacity: 0.42;
+}
+
+.todo-line {
+  position: absolute;
+  z-index: 2;
+  right: 1em;
+  bottom: 0;
+  left: 1em;
+  height: 2px;
+  border-radius: 4px;
+  background-color: #000000;
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.workspace-search-field:focus-within .todo-line {
+  animation: workspace-search-line-draw 0.3s ease-in forwards;
+  background: rgb(49, 228, 255);
+}
+
+@keyframes workspace-search-line-draw {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+    filter: hue-rotate(0deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+    filter: hue-rotate(360deg);
+  }
 }
 
 .enabled-filter-control {
@@ -938,6 +1090,7 @@
 .descendant-toggle {
   min-height: 28px;
   gap: 7px;
+  margin-top: -1.8px;
   padding: 0 9px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
@@ -1032,10 +1185,4 @@
 
 .empty-state p {
   margin: 0;
-}
-
-@media (max-width: 1199px) {
-  .workspace-layout {
-    grid-template-columns: 220px minmax(0, 1fr);
-  }
 }

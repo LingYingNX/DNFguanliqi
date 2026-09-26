@@ -1,6 +1,6 @@
 <!-- FOR AI AGENTS - Human readability is a side effect, not a goal -->
 <!-- Managed by agent: keep sections and order; edit content, not structure -->
-<!-- Last updated: 2026-09-22 | Last verified: 2026-09-22 -->
+<!-- Last updated: 2026-09-26 | Last verified: 2026-09-26 -->
 
 # AGENTS.md
 
@@ -43,11 +43,12 @@ pnpm exec install-electron       # 发布/打包前准备 Electron 二进制
 pnpm release                     # 构建并发布 GitHub Release（需要 GH_TOKEN）
 pnpm verify:portable             # 校验 portable 产物
 pnpm verify:packaged             # 校验打包产物
+pnpm verify:nsis                 # 校验 NSIS 安装/更新/卸载保留用户数据
 pnpm verify:no-dup-helpers       # 拒绝重复的路径/状态辅助实现
 pnpm doctor                      # react-doctor 诊断
 ```
 
-日常启动：直接双击 `启动DNF补丁管理器.bat`；启动器自动对比 `src/`、`package.json`、`electron.vite.config.ts` 与 `out/` 产物的修改时间，源码较新时先执行 `pnpm build` 再启动，因此双击启动总能看到最新源码改动。`--check` 只检查并按需构建不启动，`--repair` 强制重建。
+日常启动：直接双击 `启动DNF补丁管理器.bat`；启动器自动对比 `src/`、`package.json`、`electron.vite.config.ts` 与 `out/` 产物的修改时间，源码较新时先执行 `pnpm build` 再启动，因此双击启动总能看到最新源码改动。`--check` 只检查并按需构建不启动，`--repair` 强制重建。仓库 Bash 脚本（如 `pnpm verify:nsis`、`scripts/verify-harness.sh`）需显式用 Git Bash（`C:\Program Files\Git\bin\bash.exe`）运行，或在 `PATH` 中临时加入 `C:\Program Files\Git\bin`。
 
 ## 目录结构
 
@@ -113,6 +114,7 @@ pnpm doctor                      # react-doctor 诊断
 ### 工作范围
 
 - 只改任务点名的部分，不做顺手重构或重排。
+- OpenSpec：根目录存在 `openspec/` 时，先运行 `openspec list --json` 和 `openspec list --specs --json`；有未完成 tasks 的 change 用 `openspec-apply-change` 继续，全部完成则提示归档。
 - 发明新模式前，先读树内不少于 2 个相似模块再对齐。
 - 复用已有辅助；仅当没有现成覆盖时才新增依赖。
 - **写路径/状态辅助前先查 `src/AGENTS.md` 的「禁止重复造路径/状态辅助」表**：路径比较、`.npk` 判断、`..` 穿越校验、ENOENT 捕获、状态读取回退都已有唯一共享实现，不得再写本地副本或内联等价表达式。该约束由 `scripts/check-path-helpers.mjs` 机器强制（pre-commit 与 CI 双端拦截，本地可跑 `pnpm verify:no-dup-helpers`）；钩子由 `prepare` 脚本在 `pnpm install` 时自动装上，新克隆后请确认 `git config core.hooksPath` 为 `.githooks`。
@@ -121,9 +123,7 @@ pnpm doctor                      # react-doctor 诊断
 - 同一错误连续失败 3 次后停下上报：复现、已排除假设、阻塞点。
 - **任务收尾时必须自查经验落盘，不要等用户提醒**：排查确认了非显而易见根因的 bug、或用非常规手段绕过环境/工具坑的经历，收尾前写入 `.learnings/ERRORS.md`（格式 `[ERR-YYYYMMDD-XXX]`，含 Summary/Error/Solution/Prevention 与 Recurrence-Count 等字段）。hook 注入的 `<error-detected>` / `<self-improvement-reminder>` 只是提醒信号，落盘动作由本条约束。反例：2026-09-17 修复开关闪烁时只记了环境坑（ERR-20260917-002），主根因（ERR-20260917-003）被用户追问才补上。
 
-### Mem0（MCP：`mem0`）
-
-- 凭经验作答前先 `search_memory`；只在 git/代码无法推导的耐用结论上用 `add_memory`；新发现推翻旧条目时改写或删除。
+- Mem0（MCP）：凭经验作答前先 `search_memory`；只在 git/代码无法推导的耐用结论上用 `add_memory`；新发现推翻旧条目时改写或删除。
 
 ## 文档指针（Pointer）
 
@@ -142,7 +142,7 @@ pnpm doctor                      # react-doctor 诊断
 | [tests/AGENTS.md](./tests/AGENTS.md) | 测试分层、运行方式与断言约定 |
 | [.github/workflows/AGENTS.md](./.github/workflows/AGENTS.md) | CI 与发布流水线约束 |
 
-> 进入上述目录修改文件前，必须先读该目录的 `AGENTS.md`；其规则覆盖根文件。
+> 进入上述目录修改文件前，必须先读该目录的 `AGENTS.md`；其规则覆盖根文件。 `CLAUDE.md` / `GEMINI.md` 兼容入口未保留（d863d79 删除占位文件），agent-rules 的 `validate-structure.sh` 报 symlink 错误属预期例外，不要再生成。
 
 ## 任务边界
 

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DnfApi } from "../../shared/ipc-contracts";
 import type { CategorySnapshot, ChildCategory } from "../../shared/library-dto";
-import { pathKey } from "../../shared/path-key";
 import type { NavigationSelection, ViewMode } from "../workspace/model";
 import { workspaceItemKey } from "../workspace/model";
 import { useAppearance } from "../workspace/useAppearance";
@@ -21,26 +20,26 @@ import { type PresetDialog, PresetDialogs } from "./PresetDialogs";
 import { PresetWorkspace } from "./PresetWorkspace";
 import { Toast } from "./primitives";
 import { SettingsDialog } from "./SettingsDialog";
+import { SidebarResizeHandle } from "./SidebarResizeHandle";
 import { WindowTitleBar } from "./WindowTitleBar";
 
 type WorkspaceAppProps = {
   readonly client: DnfApi | undefined;
 };
 
-function moveTargets(
-  snapshot: CategorySnapshot | null,
-  currentCategoryPath: string,
-): readonly MoveTarget[] {
+const DEFAULT_SIDEBAR_WIDTH = 232;
+const MINIMUM_SIDEBAR_WIDTH = 200;
+const MAXIMUM_SIDEBAR_WIDTH = 520;
+
+function moveTargets(snapshot: CategorySnapshot | null): readonly MoveTarget[] {
   if (snapshot === null) {
     return [];
   }
-  const normalizedCurrentPath = pathKey(currentCategoryPath);
   const mapTargets = (categories: readonly ChildCategory[]): readonly MoveTarget[] =>
     categories.map((category) => ({
       children: mapTargets(category.childCategories),
       label: category.name,
       relativePath: category.relativePath,
-      disabled: pathKey(category.relativePath) === normalizedCurrentPath,
     }));
   return mapTargets(snapshot.childCategories);
 }
@@ -88,6 +87,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
   const notice = gameDirectory.notice ?? workspace.notice;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const appearance = useAppearance(client, workspace.showNotice);
   const recovery = useRecoveryState(client);
   const [noticeLeaving, setNoticeLeaving] = useState(false);
@@ -162,7 +162,7 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
         onRevealSource={(relativePath) => void workspace.revealPatch(relativePath)}
         onIncludeDescendantsChange={workspace.setIncludeDescendants}
         onEnabledFilterChange={workspace.setEnabledFilter}
-        moveTargets={moveTargets(workspace.navigationSnapshot, workspace.categoryPath)}
+        moveTargets={moveTargets(workspace.navigationSnapshot)}
         onDissolveGroup={() => {
           setOperationBusy(true);
           void operations.dissolveGroup().finally(() => setOperationBusy(false));
@@ -269,7 +269,11 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
   const deletionTargetPath = categoryDeletePath || workspace.categoryPath;
 
   return (
-    <div className="app-shell" data-read-only={recovery.readOnly}>
+    <div
+      className="app-shell"
+      data-read-only={recovery.readOnly}
+      style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}
+    >
       <WindowTitleBar client={client} update={appUpdate} />
       {recovery.readOnly ? (
         <div className="recovery-banner" role="alert">
@@ -312,6 +316,16 @@ export function WorkspaceApp({ client }: WorkspaceAppProps): React.JSX.Element {
           onSelect={(relativePath) => navigate({ kind: "category", relativePath })}
           onSelectNavigation={navigate}
           snapshot={workspace.navigationSnapshot}
+        />
+        <SidebarResizeHandle
+          maximumWidth={MAXIMUM_SIDEBAR_WIDTH}
+          minimumWidth={MINIMUM_SIDEBAR_WIDTH}
+          onChange={(width) =>
+            setSidebarWidth(
+              Math.min(MAXIMUM_SIDEBAR_WIDTH, Math.max(MINIMUM_SIDEBAR_WIDTH, Math.round(width))),
+            )
+          }
+          width={sidebarWidth}
         />
         {itemWorkspace}
       </div>

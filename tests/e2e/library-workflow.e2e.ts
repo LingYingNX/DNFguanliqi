@@ -436,7 +436,10 @@ test("opens move destinations from the context-menu hover submenu", async () => 
   const newPath = join(libraryRoot, "分类A", "coat.npk");
   await mkdir(join(libraryRoot, "分类A"), { recursive: true });
   await mkdir(nestedCategory, { recursive: true });
-  await mkdir(gameRoot, { recursive: true });
+  await Promise.all([
+    mkdir(join(gameRoot, "ImagePacks2"), { recursive: true }),
+    mkdir(join(gameRoot, "SoundPacks"), { recursive: true }),
+  ]);
   await writeFile(oldPath, "coat-payload");
   const application = await electron.launch({ args: [projectRoot], cwd: runtimeRoot });
 
@@ -450,15 +453,57 @@ test("opens move destinations from the context-menu hover submenu", async () => 
       .toMatchObject({ ok: true, value: { gameDirectory: gameRoot } });
     const card = page.getByRole("button", { name: "coat.npk", exact: true });
     await card.click({ button: "right" });
-    const menuBox = await page.getByRole("menu").boundingBox();
+    const menu = page.getByRole("menu");
+    await expect
+      .poll(() => menu.evaluate((element) => element.getBoundingClientRect().width))
+      .toBeGreaterThanOrEqual(172);
+    const menuBox = await menu.boundingBox();
     expect(menuBox).not.toBeNull();
     if (menuBox === null) throw new Error("Context menu did not expose a bounding box");
-    expect(menuBox.width).toBe(150);
+    expect(menuBox.width).toBeLessThanOrEqual(240);
+    const menuStyles = await menu.evaluate((element) => {
+      const styles = getComputedStyle(element);
+      return {
+        backdropFilter: styles.backdropFilter,
+        backgroundColor: styles.backgroundColor,
+        borderRadius: styles.borderRadius,
+        padding: styles.padding,
+      };
+    });
+    expect(menuStyles).toEqual({
+      backdropFilter: expect.stringContaining("blur(28px)"),
+      backgroundColor: "rgba(20, 24, 35, 0.9)",
+      borderRadius: "5px",
+      padding: "4px",
+    });
+    await expect(page.locator(".item-context-menu-shortcut")).toHaveText(["Ctrl+G", "F2", "Del"]);
+    await expect(page.locator(".item-context-menu-separator")).toHaveCount(1);
     const move = page.getByRole("menuitem", { name: "移动", exact: true });
     const moveBox = await move.boundingBox();
     expect(moveBox).not.toBeNull();
     if (moveBox === null) throw new Error("Move menu item did not expose a bounding box");
-    expect(moveBox.width).toBe(130);
+    expect(moveBox.width).toBeGreaterThan(0);
+    await move.hover();
+    const pill = page.locator(".item-context-menu-pill").first();
+    await expect(pill).toHaveAttribute("data-danger", "false");
+    const movePillTop = await pill.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).top),
+    );
+    await expect
+      .poll(() => move.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgba(0, 0, 0, 0)");
+    const remove = page.getByRole("menuitem", { name: "删除", exact: true });
+    await remove.hover();
+    await expect(pill).toHaveAttribute("data-danger", "true");
+    await expect
+      .poll(() => pill.evaluate((element) => Number.parseFloat(getComputedStyle(element).top)))
+      .toBeGreaterThan(movePillTop);
+    await expect
+      .poll(() => pill.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgba(244, 63, 94, 0.2)");
+    await expect
+      .poll(() => remove.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgba(0, 0, 0, 0)");
     await move.hover();
     const nestedTarget = page.getByRole("menuitem", { name: "Nested", exact: true });
     const categoryTarget = page.getByRole("menuitem", { name: "分类A", exact: true });
@@ -470,7 +515,7 @@ test("opens move destinations from the context-menu hover submenu", async () => 
     const targetBox = await categoryTarget.boundingBox();
     expect(targetBox).not.toBeNull();
     if (targetBox === null) throw new Error("Move target did not expose a bounding box");
-    expect(targetBox.width).toBeCloseTo(130, 3);
+    expect(targetBox.width).toBeGreaterThan(0);
     await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, {
       steps: 8,
     });
@@ -514,13 +559,13 @@ test("moves a patch into a nested category without a game directory", async () =
     const move = page.getByRole("menuitem", { name: "移动", exact: true });
     await move.hover();
     const femaleTarget = page.getByRole("menuitem", { name: "Female", exact: true });
-    await expect(femaleTarget).toBeDisabled();
+    await expect(femaleTarget).toBeEnabled();
     await femaleTarget.locator("xpath=..").hover();
     const target = page.getByRole("menuitem", { name: "Male", exact: true });
     await expect(target).toBeVisible();
     await expect
       .poll(() => move.evaluate((element) => getComputedStyle(element).paddingTop))
-      .toBe("4px");
+      .toBe("6px");
     await target.click();
 
     await expect
@@ -534,6 +579,54 @@ test("moves a patch into a nested category without a game directory", async () =
     await expect(access(oldPath)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readFile(newPath, "utf8")).resolves.toBe("coat-payload");
     await expect(page.getByRole("button", { name: "Male", exact: true })).toContainText("1");
+  } finally {
+    await application.close();
+    await rm(runtimeRoot, { force: true, recursive: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+test("keeps every folder move target selectable for a descendant patch", async () => {
+  const projectRoot = resolve(import.meta.dirname, "../..");
+  const runtimeRoot = await mkdtemp(join(tmpdir(), "dnf-parent-move-target-e2e-"));
+  const parentName = "技能";
+  const childName = "11111111111111111111111111";
+  const parentRoot = join(runtimeRoot, "patch-categories", parentName);
+  const childRoot = join(parentRoot, childName);
+  await mkdir(childRoot, { recursive: true });
+  await writeFile(join(childRoot, "coat.npk"), "coat-payload");
+  const application = await electron.launch({ args: [projectRoot], cwd: runtimeRoot });
+
+  try {
+    const page = await application.firstWindow();
+    await page.getByRole("main", { name: "补丁工作区" }).waitFor();
+    await page.getByRole("button", { name: parentName, exact: true }).click();
+    await page.getByRole("checkbox", { name: "包含子分类" }).check();
+    const card = page.getByRole("button", { name: /coat\.npk.*技能\\111/u });
+    await card.waitFor();
+    await card.click({ button: "right" });
+
+    const move = page.getByRole("menuitem", { name: "移动", exact: true });
+    await move.hover();
+    const parentTarget = page.getByRole("menuitem", { name: parentName, exact: true });
+    await expect(parentTarget).toBeEnabled();
+    await expect(parentTarget).toHaveClass(/has-children/u);
+    await expect
+      .poll(() => parentTarget.evaluate((element) => getComputedStyle(element).opacity))
+      .toBe("1");
+    await parentTarget.hover();
+    const parentPill = parentTarget.locator(
+      "xpath=ancestor::div[contains(@class, 'item-context-menu-list')][1]/div[contains(@class, 'item-context-menu-pill')]",
+    );
+    await expect(parentPill).toHaveAttribute("data-danger", "false");
+    await expect
+      .poll(() => parentPill.evaluate((element) => getComputedStyle(element).opacity))
+      .toBe("1");
+
+    const childTarget = page.getByRole("menuitem", { name: childName, exact: true });
+    await expect(childTarget).toBeEnabled();
+    await expect
+      .poll(() => childTarget.evaluate((element) => getComputedStyle(element).opacity))
+      .toBe("1");
   } finally {
     await application.close();
     await rm(runtimeRoot, { force: true, recursive: true, maxRetries: 5, retryDelay: 100 });
@@ -568,7 +661,7 @@ test("moves from a nested category to another root category", async () => {
 
     const femaleTarget = page.getByRole("menuitem", { name: "Female", exact: true });
     await femaleTarget.locator("xpath=..").hover();
-    await expect(page.getByRole("menuitem", { name: "Male", exact: true })).toBeDisabled();
+    await expect(page.getByRole("menuitem", { name: "Male", exact: true })).toBeEnabled();
     await expect(otherTarget).toBeVisible();
     await otherTarget.click();
 
@@ -706,6 +799,56 @@ test("moves a nested category into another category from the tree", async () => 
         JSON.parse(await readFile(join(runtimeRoot, "data", "category-order.json"), "utf8")),
       )
       .toMatchObject({ orders: { Female: [], Interface: ["Interface\\Male"] } });
+  } finally {
+    await application.close();
+    await rm(runtimeRoot, { force: true, recursive: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+test("moves a nested category out to the root with the blank drop zone", async () => {
+  const projectRoot = resolve(import.meta.dirname, "../..");
+  const runtimeRoot = await mkdtemp(join(tmpdir(), "dnf-category-root-move-e2e-"));
+  const nestedCategory = join(runtimeRoot, "patch-categories", "Parent", "Child");
+  await mkdir(nestedCategory, { recursive: true });
+  await mkdir(join(runtimeRoot, "patch-categories", "Sibling"), { recursive: true });
+  await writeFile(join(nestedCategory, "child.npk"), "child-payload");
+  const application = await electron.launch({
+    args: [`--user-data-dir=${join(runtimeRoot, "electron-data")}`, projectRoot],
+    cwd: runtimeRoot,
+  });
+
+  try {
+    const page = await application.firstWindow();
+    await page.getByRole("main", { name: "补丁工作区" }).waitFor();
+    await page.getByRole("button", { name: "展开 Parent", exact: true }).click();
+    const source = page.getByRole("button", { name: "Child", exact: true });
+    await expect(source).toBeVisible();
+    const sourceBox = await source.boundingBox();
+    expect(sourceBox).not.toBeNull();
+    if (sourceBox === null) throw new Error("Nested category row did not expose coordinates");
+
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+    await page.mouse.down();
+    const dropZone = page.locator("[data-category-root-drop]");
+    await expect(dropZone).toBeVisible();
+    const dropBox = await dropZone.boundingBox();
+    expect(dropBox).not.toBeNull();
+    if (dropBox === null) throw new Error("Root drop zone did not expose coordinates");
+    await page.mouse.move(dropBox.x + dropBox.width / 2, dropBox.y + dropBox.height / 2, {
+      steps: 8,
+    });
+    await page.mouse.up();
+
+    const movedCategory = join(runtimeRoot, "patch-categories", "Child");
+    await expect
+      .poll(() =>
+        access(join(movedCategory, "child.npk")).then(
+          () => true,
+          () => false,
+        ),
+      )
+      .toBe(true);
+    await expect(access(nestedCategory)).rejects.toMatchObject({ code: "ENOENT" });
   } finally {
     await application.close();
     await rm(runtimeRoot, { force: true, recursive: true, maxRetries: 5, retryDelay: 100 });

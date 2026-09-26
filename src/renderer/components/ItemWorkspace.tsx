@@ -94,7 +94,6 @@ export type MoveTarget = {
   readonly children: readonly MoveTarget[];
   readonly label: string;
   readonly relativePath: string;
-  readonly disabled: boolean;
 };
 
 function moveTargetActions(
@@ -106,7 +105,6 @@ function moveTargetActions(
     ...(target.children.length === 0
       ? {}
       : { children: moveTargetActions(target.children, selectedItems, onMoveTo) }),
-    disabled: target.disabled,
     icon: <FolderInput size={15} />,
     label: target.label,
     onClick: () => onMoveTo(target.relativePath, selectedItems.map(workspaceItemReference)),
@@ -304,6 +302,7 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
               icon: <Boxes size={16} />,
               label: "\u6253\u7ec4",
               onClick: props.onCreateGroup,
+              shortcut: "Ctrl+G",
             },
             {
               disabled: !contextMenu.selectedItems.every((item) => item.kind === "patch"),
@@ -315,6 +314,7 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
               icon: <Pencil size={16} />,
               label: "\u91cd\u547d\u540d",
               onClick: () => beginRename(contextMenu.item),
+              shortcut: "F2",
             },
             {
               icon: <FolderOpen size={16} />,
@@ -326,6 +326,8 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
               label: "\u5220\u9664",
               onClick: props.onRecycle,
               kind: "delete",
+              separatorBefore: true,
+              shortcut: "Del",
             },
           ];
 
@@ -419,6 +421,7 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
               type="search"
               value={props.query}
             />
+            <span aria-hidden="true" className="todo-line" />
           </label>
           <fieldset className="view-mode-control" aria-label="项目视图">
             <button
@@ -700,7 +703,9 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
                   title={itemCategoryPath(item)}
                   type="button"
                 >
-                  <span className="item-preview">
+                  <span
+                    className={`item-preview ${item.previewUrl === null ? "item-preview-empty" : ""}`}
+                  >
                     {item.previewUrl === null ? (
                       item.kind === "group" ? (
                         <Box size={30} />
@@ -720,7 +725,9 @@ export function ItemWorkspace(props: ItemWorkspaceProps): React.JSX.Element {
                       <span className="item-title">{item.name}</span>
                       {location === null ? null : <span className="item-location">{location}</span>}
                     </span>
-                    <span className="item-type">{itemType(item)}</span>
+                    {item.kind === "patch" ? null : (
+                      <span className="item-type">{itemType(item)}</span>
+                    )}
                     <span className="item-meta">{itemDescription(item)}</span>
                     <span className="item-date">{itemDate(item)}</span>
                   </span>

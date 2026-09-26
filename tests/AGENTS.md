@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-09-16 -->
+<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-09-26 -->
 
 # AGENTS.md — tests
 
@@ -21,6 +21,7 @@
 - `vitest.config.ts`（含 `tests/unit`、`tests/renderer`）为 jsdom；`vitest.integration.config.ts` 为 node。
 - `clearMocks` 与 `restoreMocks` 已开启；测试间不得共享可变状态。
 - 涉及中文路径/文件的用例必须用真实路径写法，不要硬编码盘符假设。
+- Windows PowerShell 的 `PATH` 可能没有 `bash`；`tests/unit/verify-harness-drift.test.ts` 的 `spawnSync("bash", ...)` 会返回 `ENOENT`，表现为 `stdout` 为 `undefined`。先临时加入 `C:\Program Files\Git\bin` 或用 Git Bash 运行，不要改断言掩盖环境问题（ERR-20260924-001）。
 
 ## Running tests
 

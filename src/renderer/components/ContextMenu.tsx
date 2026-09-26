@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // 菜单与窗口边缘的最小间距，与侧边栏分类菜单的收边留白一致。
 const VIEWPORT_MARGIN = 8;
@@ -11,6 +11,8 @@ export type ContextMenuAction = {
   readonly kind?: "delete";
   readonly label: string;
   readonly onClick: () => void;
+  readonly separatorBefore?: boolean;
+  readonly shortcut?: string;
 };
 
 type ContextMenuProps = {
@@ -41,6 +43,13 @@ function pathsEqual(first: readonly number[], second: readonly number[]): boolea
   );
 }
 
+function ariaShortcut(shortcut: string | undefined): string | undefined {
+  if (shortcut === undefined) return undefined;
+  if (shortcut === "Ctrl+") return "Control+";
+  if (shortcut.startsWith("Ctrl+")) return `Control+${shortcut.slice("Ctrl+".length)}`;
+  return shortcut === "Del" ? "Delete" : shortcut;
+}
+
 function MenuList({
   actions,
   disabled,
@@ -49,8 +58,40 @@ function MenuList({
   path,
   setOpenPath,
 }: MenuListProps): React.JSX.Element {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const pillRef = useRef<HTMLDivElement | null>(null);
+
+  const movePill = (target: HTMLElement, danger: boolean): void => {
+    const list = listRef.current;
+    const pill = pillRef.current;
+    if (list === null || pill === null) return;
+    const listRect = list.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    pill.style.top = `${targetRect.top - listRect.top}px`;
+    pill.style.left = `${targetRect.left - listRect.left}px`;
+    pill.style.width = `${targetRect.width}px`;
+    pill.style.height = `${targetRect.height}px`;
+    pill.style.opacity = "1";
+    pill.dataset["danger"] = danger ? "true" : "false";
+  };
+
+  const hidePill = (): void => {
+    const pill = pillRef.current;
+    if (pill !== null) pill.style.opacity = "0";
+  };
+
+  const hidePillIfLeavingList = (
+    event: React.FocusEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>,
+  ): void => {
+    if (event.relatedTarget instanceof Node && listRef.current?.contains(event.relatedTarget)) {
+      return;
+    }
+    hidePill();
+  };
+
   return (
-    <div className="item-context-menu-list list">
+    <div className="item-context-menu-list list" ref={listRef}>
+      <div aria-hidden="true" className="item-context-menu-pill" ref={pillRef} />
       {actions.map((action, index) => {
         const actionPath = [...path, index];
         const children = action.children ?? [];
@@ -66,53 +107,75 @@ function MenuList({
           runAction();
         };
 
-        return hasChildren ? (
-          <fieldset
-            className="item-context-submenu"
-            key={action.label}
-            onFocus={() => setOpenPath(actionPath)}
-            onMouseEnter={() => setOpenPath(actionPath)}
-          >
-            <button
-              aria-expanded={expanded}
-              aria-haspopup="menu"
-              className={`item-context-menu-item element${action.kind === "delete" ? " delete" : ""}`}
-              disabled={disabled || action.disabled}
-              onClick={runAction}
-              onPointerDown={runPointerAction}
-              role="menuitem"
-              type="button"
-            >
-              {action.icon}
-              <span>{action.label}</span>
-              <ChevronRight className="item-context-menu-chevron" size={14} />
-            </button>
-            {expanded ? (
-              <div className="item-context-submenu-panel card" role="menu">
-                <MenuList
-                  actions={children}
-                  disabled={disabled}
-                  onClose={onClose}
-                  openPath={openPath}
-                  path={actionPath}
-                  setOpenPath={setOpenPath}
-                />
-              </div>
+        return (
+          <Fragment key={action.label}>
+            {action.separatorBefore ? (
+              <div aria-hidden="true" className="item-context-menu-separator" />
             ) : null}
-          </fieldset>
-        ) : (
-          <button
-            className={`item-context-menu-item element${action.kind === "delete" ? " delete" : ""}`}
-            disabled={disabled || action.disabled}
-            key={action.label}
-            onClick={runAction}
-            onPointerDown={runPointerAction}
-            role="menuitem"
-            type="button"
-          >
-            {action.icon}
-            <span>{action.label}</span>
-          </button>
+            {hasChildren ? (
+              <fieldset
+                className="item-context-submenu"
+                onFocus={() => setOpenPath(actionPath)}
+                onMouseEnter={() => setOpenPath(actionPath)}
+              >
+                <button
+                  aria-expanded={expanded}
+                  aria-haspopup="menu"
+                  aria-keyshortcuts={ariaShortcut(action.shortcut)}
+                  className={`item-context-menu-item element has-children${action.kind === "delete" ? " delete" : ""}`}
+                  data-danger={action.kind === "delete" ? "true" : undefined}
+                  disabled={disabled || action.disabled}
+                  onClick={runAction}
+                  onFocus={(event) => movePill(event.currentTarget, action.kind === "delete")}
+                  onBlur={hidePillIfLeavingList}
+                  onMouseEnter={(event) => movePill(event.currentTarget, action.kind === "delete")}
+                  onMouseLeave={hidePillIfLeavingList}
+                  onPointerDown={runPointerAction}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span className="item-context-menu-icon">{action.icon}</span>
+                  <span className="item-context-menu-label">{action.label}</span>
+                  <ChevronRight className="item-context-menu-chevron" size={14} />
+                </button>
+                {expanded ? (
+                  <div className="item-context-submenu-panel card" role="menu">
+                    <MenuList
+                      actions={children}
+                      disabled={disabled}
+                      onClose={onClose}
+                      openPath={openPath}
+                      path={actionPath}
+                      setOpenPath={setOpenPath}
+                    />
+                  </div>
+                ) : null}
+              </fieldset>
+            ) : (
+              <button
+                aria-keyshortcuts={ariaShortcut(action.shortcut)}
+                className={`item-context-menu-item element${action.kind === "delete" ? " delete" : ""}`}
+                data-danger={action.kind === "delete" ? "true" : undefined}
+                disabled={disabled || action.disabled}
+                onClick={runAction}
+                onFocus={(event) => movePill(event.currentTarget, action.kind === "delete")}
+                onBlur={hidePillIfLeavingList}
+                onMouseEnter={(event) => movePill(event.currentTarget, action.kind === "delete")}
+                onMouseLeave={hidePillIfLeavingList}
+                onPointerDown={runPointerAction}
+                role="menuitem"
+                type="button"
+              >
+                <span className="item-context-menu-icon">{action.icon}</span>
+                <span className="item-context-menu-label">{action.label}</span>
+                {action.shortcut === undefined ? null : (
+                  <span aria-hidden="true" className="item-context-menu-shortcut">
+                    {action.shortcut}
+                  </span>
+                )}
+              </button>
+            )}
+          </Fragment>
         );
       })}
     </div>

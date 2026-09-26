@@ -2,7 +2,11 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../src/renderer/App";
-import type { DnfApi, MoveCategoryRequest } from "../../src/shared/ipc-contracts";
+import {
+  type DnfApi,
+  type MoveCategoryRequest,
+  MoveCategoryRequestSchema,
+} from "../../src/shared/ipc-contracts";
 import { createFakeApi, WORKSPACE_SNAPSHOT } from "./fake-api";
 
 afterEach(cleanup);
@@ -232,5 +236,104 @@ describe("category tree", () => {
         },
       ]),
     );
+  });
+
+  it("moves a nested category out to the root level", async () => {
+    const requests: MoveCategoryRequest[] = [];
+    const snapshot = {
+      ...WORKSPACE_SNAPSHOT,
+      childCategories: [
+        {
+          name: "Parent",
+          relativePath: "Parent",
+          patchCount: 0,
+          childCategories: [
+            { name: "Child", relativePath: "Parent\\Child", patchCount: 0, childCategories: [] },
+          ],
+        },
+        { name: "Sibling", relativePath: "Sibling", patchCount: 0, childCategories: [] },
+      ],
+    };
+    const api = {
+      ...createFakeApi(snapshot),
+      moveCategory: async (request: MoveCategoryRequest) => {
+        requests.push(request);
+        return { ok: true as const, value: { relativePath: "Child" } };
+      },
+    };
+    render(<App api={api} />);
+    fireEvent.click(await screen.findByRole("button", { name: "展开 Parent" }));
+    const child = screen.getByRole("button", { name: "Child" });
+    const sibling = screen.getByRole("button", { name: "Sibling" });
+    vi.spyOn(sibling, "getBoundingClientRect").mockReturnValue({
+      bottom: 30,
+      height: 30,
+      left: 0,
+      right: 200,
+      top: 0,
+      width: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(child, { buttons: 1, pointerId: 1 });
+    fireEvent.pointerEnter(sibling, { buttons: 1, pointerId: 1, clientY: 29 });
+    fireEvent.pointerUp(sibling, { pointerId: 1 });
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]).toEqual({
+      sourceParentRelativePath: "Parent",
+      sourceRelativePath: "Parent\\Child",
+      targetParentRelativePath: "",
+      targetIndex: 2,
+      sourceParentChildRelativePaths: [],
+      targetParentChildRelativePaths: ["Parent", "Sibling", "Child"],
+    });
+  });
+  it("moves a nested category out to the root via the blank drop zone", async () => {
+    const requests: MoveCategoryRequest[] = [];
+    const snapshot = {
+      ...WORKSPACE_SNAPSHOT,
+      childCategories: [
+        {
+          name: "Parent",
+          relativePath: "Parent",
+          patchCount: 0,
+          childCategories: [
+            { name: "Child", relativePath: "Parent\\Child", patchCount: 0, childCategories: [] },
+          ],
+        },
+        { name: "Sibling", relativePath: "Sibling", patchCount: 0, childCategories: [] },
+      ],
+    };
+    const api = {
+      ...createFakeApi(snapshot),
+      moveCategory: async (request: MoveCategoryRequest) => {
+        requests.push(request);
+        return { ok: true as const, value: { relativePath: "Child" } };
+      },
+    };
+    render(<App api={api} />);
+    fireEvent.click(await screen.findByRole("button", { name: "展开 Parent" }));
+    const child = screen.getByRole("button", { name: "Child" });
+
+    fireEvent.pointerDown(child, { buttons: 1, pointerId: 1 });
+    const dropZone = document.querySelector("[data-category-root-drop]");
+    expect(dropZone).not.toBeNull();
+    if (dropZone === null) throw new Error("root drop zone missing");
+    fireEvent.pointerEnter(dropZone, { buttons: 1, pointerId: 1 });
+    fireEvent.pointerUp(dropZone, { pointerId: 1 });
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(MoveCategoryRequestSchema.safeParse(requests[0]).success).toBe(true);
+    expect(requests[0]).toEqual({
+      sourceParentRelativePath: "Parent",
+      sourceRelativePath: "Parent\\Child",
+      targetParentRelativePath: "",
+      targetIndex: 2,
+      sourceParentChildRelativePaths: [],
+      targetParentChildRelativePaths: ["Parent", "Sibling", "Child"],
+    });
   });
 });

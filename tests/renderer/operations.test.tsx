@@ -34,6 +34,15 @@ const ROOT_TREE_WORKSPACE_SNAPSHOT: CategorySnapshot = {
   ],
 };
 
+function withPatchRelativePath(snapshot: CategorySnapshot, relativePath: string): CategorySnapshot {
+  return {
+    ...snapshot,
+    patches: snapshot.patches.map((patch) =>
+      patch.name === "coat.npk" ? { ...patch, relativePath } : patch,
+    ),
+  };
+}
+
 describe("workspace operations", () => {
   it("toggles a card without selecting it", async () => {
     let enabledRequest: Parameters<DnfApi["enableItems"]>[0] | undefined;
@@ -99,10 +108,31 @@ describe("workspace operations", () => {
 
     fireEvent.contextMenu(itemButton("coat.npk"));
 
-    const labels = within(screen.getByRole("menu"))
+    const menu = screen.getByRole("menu");
+    const labels = within(menu)
       .getAllByRole("menuitem")
-      .map((item) => item.textContent);
+      .map((item) => item.querySelector(".item-context-menu-label")?.textContent);
     expect(labels).toEqual(["移动", "打组", "加入预设", "重命名", "源文件", "删除"]);
+    expect(
+      Array.from(menu.querySelectorAll(".item-context-menu-shortcut")).map(
+        (shortcut) => shortcut.textContent,
+      ),
+    ).toEqual(["Ctrl+G", "F2", "Del"]);
+    expect(menu.querySelector(".item-context-menu-separator")).not.toBeNull();
+    expect(within(menu).getByRole("menuitem", { name: "打组" })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "Control+G",
+    );
+    expect(within(menu).getByRole("menuitem", { name: "重命名" })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "F2",
+    );
+    expect(within(menu).getByRole("menuitem", { name: "删除" })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "Delete",
+    );
+    expect(menu.querySelectorAll(".item-context-menu-pill")).toHaveLength(1);
+    expect(menu.querySelector(".item-context-menu-item")?.className).not.toContain("hover");
   });
 
   it("enables every selected patch when one selected card switch is turned on", async () => {
@@ -229,7 +259,18 @@ describe("workspace operations", () => {
   });
 
   it("keeps every root category available from a nested category", async () => {
-    render(<App api={createFakeApi(ROOT_TREE_WORKSPACE_SNAPSHOT)} />);
+    const baseApi = createFakeApi(ROOT_TREE_WORKSPACE_SNAPSHOT);
+    const api: DnfApi = {
+      ...baseApi,
+      scan: async ({ relativePath }) =>
+        relativePath === "Category A"
+          ? {
+              ok: true,
+              value: withPatchRelativePath(ROOT_TREE_WORKSPACE_SNAPSHOT, "Category A\\coat.npk"),
+            }
+          : baseApi.scan({ includeDescendants: false, relativePath }),
+    };
+    render(<App api={api} />);
     await screen.findByText("coat.npk");
     fireEvent.click(screen.getByRole("button", { name: "Category A" }));
     await screen.findByText("coat.npk");
@@ -244,7 +285,7 @@ describe("workspace operations", () => {
     expect(targetPanel).not.toBeNull();
     if (!(targetPanel instanceof HTMLElement)) return;
 
-    expect(within(targetPanel).getByRole("menuitem", { name: "Category A" })).toBeDisabled();
+    expect(within(targetPanel).getByRole("menuitem", { name: "Category A" })).toBeEnabled();
     expect(within(targetPanel).getByRole("menuitem", { name: "Other" })).toBeEnabled();
 
     const categorySubmenu = targetPanel.querySelector(".item-context-submenu");
@@ -254,8 +295,60 @@ describe("workspace operations", () => {
     expect(within(targetPanel).getByRole("menuitem", { name: "Nested" })).toBeEnabled();
   });
 
-  it("disables current category in move submenu", async () => {
-    render(<App api={createFakeApi(WORKSPACE_SNAPSHOT)} />);
+  it("keeps the parent category enabled when moving a descendant patch", async () => {
+    const baseApi = createFakeApi(ROOT_TREE_WORKSPACE_SNAPSHOT);
+    const api: DnfApi = {
+      ...baseApi,
+      scan: async ({ includeDescendants, relativePath }) =>
+        relativePath === "Category A" && includeDescendants
+          ? {
+              ok: true,
+              value: withPatchRelativePath(
+                ROOT_TREE_WORKSPACE_SNAPSHOT,
+                "Category A\\Nested\\coat.npk",
+              ),
+            }
+          : baseApi.scan({ includeDescendants: false, relativePath }),
+    };
+    render(<App api={api} />);
+    await screen.findByText("coat.npk");
+    fireEvent.click(screen.getByRole("button", { name: "Category A" }));
+    await screen.findByText("coat.npk");
+    fireEvent.click(screen.getByRole("checkbox", { name: "包含子分类" }));
+    await screen.findByRole("button", { name: /coat\.npk.*Category A\\Nested/u });
+
+    fireEvent.contextMenu(itemButton("coat.npk"));
+    const moveSubmenu = screen.getByRole("menu").querySelector(".item-context-submenu");
+    expect(moveSubmenu).not.toBeNull();
+    if (moveSubmenu === null) return;
+    fireEvent.mouseEnter(moveSubmenu);
+    const targetPanel = moveSubmenu.querySelector(".item-context-submenu-panel");
+    expect(targetPanel).not.toBeNull();
+    if (!(targetPanel instanceof HTMLElement)) return;
+
+    const parentTarget = within(targetPanel).getByRole("menuitem", { name: "Category A" });
+    expect(parentTarget).toBeEnabled();
+    expect(parentTarget).toHaveClass("has-children");
+    const categorySubmenu = targetPanel.querySelector(".item-context-submenu");
+    expect(categorySubmenu).not.toBeNull();
+    if (categorySubmenu === null) return;
+    fireEvent.mouseEnter(categorySubmenu);
+    expect(within(targetPanel).getByRole("menuitem", { name: "Nested" })).toBeEnabled();
+  });
+
+  it("keeps the current category selectable in the move submenu", async () => {
+    const baseApi = createFakeApi(WORKSPACE_SNAPSHOT);
+    const api: DnfApi = {
+      ...baseApi,
+      scan: async ({ relativePath }) =>
+        relativePath === "分类A"
+          ? {
+              ok: true,
+              value: withPatchRelativePath(WORKSPACE_SNAPSHOT, "分类A\\coat.npk"),
+            }
+          : baseApi.scan({ includeDescendants: false, relativePath }),
+    };
+    render(<App api={api} />);
     await screen.findByText("coat.npk");
     fireEvent.click(screen.getByRole("button", { name: "分类A" }));
     await screen.findByText("coat.npk");
@@ -268,7 +361,7 @@ describe("workspace operations", () => {
     const targetPanel = moveSubmenu.querySelector(".item-context-submenu-panel");
     expect(targetPanel).not.toBeNull();
     if (!(targetPanel instanceof HTMLElement)) return;
-    expect(within(targetPanel).getByRole("menuitem", { name: "分类A" })).toBeDisabled();
+    expect(within(targetPanel).getByRole("menuitem", { name: "分类A" })).toBeEnabled();
   });
 
   it("moves directly to a category from the hover submenu", async () => {

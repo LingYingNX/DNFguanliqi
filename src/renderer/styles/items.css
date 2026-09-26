@@ -89,6 +89,10 @@
     linear-gradient(rgba(91, 107, 255, 0.05), rgba(91, 107, 255, 0)), var(--color-elevated);
 }
 
+.item-grid .item-card[data-kind="patch"] .item-preview-empty {
+  background: #000;
+}
+
 .item-card[data-kind="group"] .item-preview {
   color: var(--color-info);
 }
@@ -277,98 +281,169 @@
 .item-context-submenu-panel.card {
   box-sizing: border-box;
   display: flex;
-  width: 150px;
+  width: max-content;
+  min-width: 172px;
+  max-width: 240px;
   flex-direction: column;
-  gap: 10px;
-  padding: 15px 0;
-  border: 0;
-  border-radius: 6px;
-  background-color: rgba(36, 40, 50, 1);
-  background-image: linear-gradient(
-    139deg,
-    rgba(36, 40, 50, 1) 0%,
-    rgba(36, 40, 50, 1) 0%,
-    rgba(37, 28, 40, 1) 100%
-  );
+  padding: 4px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 5px;
+  background: rgb(20 24 35 / 90%);
+  box-shadow:
+    0 18px 36px -6px rgb(0 0 0 / 65%),
+    0 6px 14px -2px rgb(0 0 0 / 45%),
+    inset 0 1px 0 0 rgb(255 255 255 / 12%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
 }
 
 .item-context-menu.card {
   position: fixed;
   z-index: 120;
-  /* 从光标处"生长"出来，而不是凭空闪现。transform-origin 由内联样式按
-     实际落点（可能翻转/收边）设置，故此处不写死。 */
+  /* transform-origin 由内联样式按实际落点设置，入场缩放从光标处生长。 */
   transition:
-    opacity var(--motion-standard) var(--easing-standard),
-    transform var(--motion-standard) var(--easing-standard);
+    opacity 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @starting-style {
   .item-context-menu.card {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.95) translateY(-2px);
   }
 }
 
 .item-context-submenu-panel.card {
   position: absolute;
   z-index: 1;
-  top: -15px;
-  left: 100%;
-  /* 子菜单从父项右侧展开，原点贴左边缘。 */
+  top: -4px;
+  left: calc(100% + 4px);
+  min-width: 160px;
   transform-origin: left center;
   transition:
-    opacity var(--motion-fast) var(--easing-standard),
-    transform var(--motion-fast) var(--easing-standard);
+    opacity 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @starting-style {
   .item-context-submenu-panel.card {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.95) translateY(-2px);
   }
 }
 
 .item-context-menu-list.list {
+  position: relative;
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   margin: 0;
-  padding: 0 10px;
+  padding: 0;
   list-style-type: none;
 }
 
-.item-context-menu-separator.separator {
-  width: 100%;
-  border-top: 1.5px solid #42434a;
+.item-context-menu-pill {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 10%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    top 110ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    left 110ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 110ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 110ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 90ms ease,
+    background-color 90ms ease;
+}
+
+.item-context-menu-pill[data-danger="true"] {
+  background: rgb(244 63 94 / 20%);
+}
+
+.item-context-menu-separator {
+  position: relative;
+  z-index: 1;
+  height: 1px;
+  margin: 4px;
+  background: rgb(255 255 255 / 8%);
 }
 
 .item-context-menu-item.element {
   position: relative;
+  z-index: 1;
   display: flex;
   width: 100%;
-  min-height: 0;
+  min-height: 28px;
   box-sizing: border-box;
   align-items: center;
   gap: 10px;
-  padding: 4px 7px;
+  padding: 6px 10px;
   border: 0;
-  border-radius: 6px;
-  color: #7e8590;
+  border-radius: 5px;
+  color: #cbd5e1;
   background: transparent;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   text-align: left;
-  transition: all 0.3s ease-out;
+  transition:
+    color 90ms ease,
+    background-color 90ms ease;
 }
 
-.item-context-menu-item.element svg {
-  width: 19px;
-  height: 19px;
-  flex: 0 0 19px;
-  transition: all 0.3s ease-out;
+.item-context-menu-icon {
+  display: flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: #94a3b8;
+  transition: color 90ms ease;
+}
+
+.item-context-menu-icon svg {
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+}
+
+/* 可继续展开的目标不是禁用项，未悬停时也保持可操作的高对比文字。 */
+.item-context-menu-item.element.has-children:not(:disabled) {
+  color: #f1f5f9;
+}
+
+.item-context-menu-item.element.has-children:not(:disabled) .item-context-menu-icon {
+  color: #c7d2fe;
+}
+
+.item-context-menu-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-context-menu-shortcut {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 5px;
+  color: #94a3b8;
+  background: rgb(255 255 255 / 6%);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  transition: color 90ms ease;
 }
 
 .item-context-submenu {
@@ -382,18 +457,42 @@
 
 .item-context-menu-chevron {
   margin-left: auto;
+  color: #94a3b8;
+  transition:
+    color 90ms ease,
+    transform 90ms ease;
 }
 
 .item-context-menu-item.element:hover:not(:disabled),
 .item-context-menu-item.element:focus-visible:not(:disabled) {
-  color: #fff;
-  background-color: #5353ff;
+  color: #ffffff;
   outline: none;
-  transform: translate(1px, -1px);
 }
 
-.item-context-menu-item.element.delete:hover:not(:disabled) {
-  background-color: #8e2a2a;
+.item-context-menu-item.element:hover:not(:disabled) .item-context-menu-icon {
+  color: #a5b4fc;
+}
+
+.item-context-menu-item.element:hover:not(:disabled) .item-context-menu-chevron {
+  color: #ffffff;
+  transform: translateX(2px);
+}
+
+.item-context-menu-item.element:hover:not(:disabled) .item-context-menu-shortcut {
+  color: #e2e8f0;
+}
+
+.item-context-menu-item.element.delete {
+  color: #fb7185;
+}
+
+.item-context-menu-item.element.delete svg {
+  color: #fb7185;
+}
+
+.item-context-menu-item.element.delete:hover:not(:disabled),
+.item-context-menu-item.element.delete:focus-visible:not(:disabled) {
+  color: #fda4af;
 }
 
 .item-context-menu-item.element:active:not(:disabled) {
@@ -402,12 +501,15 @@
 
 .item-context-menu-item.element:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.38;
 }
 
 .item-context-menu-item.element:disabled:hover {
-  background-color: transparent;
   transform: none;
+}
+
+.item-context-menu-item.element:disabled:hover svg {
+  color: #94a3b8;
 }
 
 .item-card-body {
@@ -627,7 +729,7 @@
 
 .item-list .item-card-body {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 92px 112px 120px 92px;
+  grid-template-columns: minmax(260px, 1fr) auto auto auto 92px;
   width: 100%;
   height: 100%;
   align-items: center;
@@ -687,10 +789,22 @@
 
 .item-list .item-title-edit {
   top: 50%;
-  right: 477px;
+  right: calc(var(--space-3) + 32px);
   left: calc(var(--space-3) + 41px);
   width: auto;
+  height: 24px;
+  font-size: 16px;
   transform: translateY(-50%);
+}
+
+.item-list .item-title {
+  font-size: 16px;
+}
+
+.item-list .item-type,
+.item-list .item-meta,
+.item-list .item-date {
+  font-size: 14px;
 }
 
 .item-list .item-type {

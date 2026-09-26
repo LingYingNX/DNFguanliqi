@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-09-17 -->
+<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-09-26 -->
 
 # AGENTS.md — .github/workflows
 
@@ -31,6 +31,8 @@ bash scripts/verify-harness.sh
 pnpm typecheck
 pnpm test
 ```
+
+本机 PowerShell 的 `PATH` 可能没有 `bash`；运行 `scripts/verify-harness.sh` 时显式使用 `C:\Program Files\Git\bin\bash.exe`，或先把 `C:\Program Files\Git\bin` 加入 `PATH`。
 
 ## Code style & conventions
 

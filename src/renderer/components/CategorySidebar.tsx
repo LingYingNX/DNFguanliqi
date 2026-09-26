@@ -204,6 +204,7 @@ export function CategorySidebar({
 }: CategorySidebarProps): React.JSX.Element {
   const [dragState, setDragState] = useState<CategoryDragState | null>(null);
   const [dropTarget, setDropTarget] = useState<CategoryDropTarget | null>(null);
+  const [rootDropActive, setRootDropActive] = useState(false);
   const [itemDropTargetRelativePath, setItemDropTargetRelativePath] = useState<string | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(new Set());
   const [styleState, setStyleState] = useState<CategoryStyleStateDto>({
@@ -218,6 +219,7 @@ export function CategorySidebar({
   const [draftHue, setDraftHue] = useState(220);
   const [editingRelativePath, setEditingRelativePath] = useState<string | null>(null);
   const [contextMenuSize, setContextMenuSize] = useState({ width: 210, height: 170 });
+  const contextMenuPillRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const suppressNextCategoryClickRef = useRef(false);
 
@@ -238,6 +240,23 @@ export function CategorySidebar({
     });
   }, [client]);
 
+  // 指针在侧栏外松开时不会触发 nav 的 onPointerUp，拖拽状态与落点会残留下来，
+  // 之后一次普通点击就会被当成“完成移动”。用 window 兜底取消。
+  useEffect(() => {
+    if (dragState === null) return;
+    const cancelDrag = (): void => {
+      draggingRef.current = false;
+      setDragState(null);
+      setRootDropActive(false);
+      setDropTarget(null);
+    };
+    window.addEventListener("pointerup", cancelDrag);
+    window.addEventListener("pointercancel", cancelDrag);
+    return () => {
+      window.removeEventListener("pointerup", cancelDrag);
+      window.removeEventListener("pointercancel", cancelDrag);
+    };
+  }, [dragState]);
   useEffect(() => {
     if (contextMenu === null) return;
     const closeOnPointerDown = (event: PointerEvent): void => {
@@ -268,6 +287,33 @@ export function CategorySidebar({
     onSelect(relativePath);
   };
 
+  const moveContextMenuPill = (target: HTMLButtonElement, danger: boolean): void => {
+    const pill = contextMenuPillRef.current;
+    const menu = pill?.parentElement;
+    if (pill === null || menu === null || menu === undefined) return;
+    const menuRect = menu.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    pill.style.top = `${targetRect.top - menuRect.top}px`;
+    pill.style.left = `${targetRect.left - menuRect.left}px`;
+    pill.style.width = `${targetRect.width}px`;
+    pill.style.height = `${targetRect.height}px`;
+    pill.style.opacity = "1";
+    pill.dataset["danger"] = danger ? "true" : "false";
+  };
+
+  const hideContextMenuPill = (): void => {
+    const pill = contextMenuPillRef.current;
+    if (pill !== null) pill.style.opacity = "0";
+  };
+
+  const hideContextMenuPillIfLeavingActions = (
+    event: React.FocusEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>,
+  ): void => {
+    const actions = event.currentTarget.closest(".category-context-actions");
+    if (event.relatedTarget instanceof Node && actions?.contains(event.relatedTarget)) return;
+    hideContextMenuPill();
+  };
+
   const startCategoryDrag = (nextDrag: CategoryDragState): void => {
     draggingRef.current = false;
     suppressNextCategoryClickRef.current = false;
@@ -279,7 +325,33 @@ export function CategorySidebar({
   const updateCategoryDropTarget = (nextTarget: CategoryDropTarget): void => {
     if (dragState === null) return;
     draggingRef.current = true;
+    setRootDropActive(false);
     setDropTarget(nextTarget);
+  };
+
+  // 拖拽嵌套文件夹时，树下方留白作为“移出到根目录”的落点：根级行只有上下
+  // 25% 的边缘带算同级，落进行中部会被判为“放进该文件夹”，往外拖几乎必然落空。
+  const updateRootDropTarget = (): void => {
+    if (dragState === null || dragState.sourceParentRelativePath === "") return;
+    const rootCategories = snapshot?.childCategories ?? [];
+    const remaining = rootCategories.filter(
+      (category) => category.relativePath !== dragState.sourceRelativePath,
+    );
+    const sourceCategory = dragState.sourceCategories.find(
+      (category) => category.relativePath === dragState.sourceRelativePath,
+    );
+    if (sourceCategory === undefined) return;
+    setRootDropActive(true);
+    draggingRef.current = true;
+    setDropTarget({
+      position: "after",
+      targetCategories: rootCategories,
+      // finishOrdering 先滤掉来源再 splice，因此“追加到末尾”等于过滤后的长度。
+      targetIndex: remaining.length,
+      targetParentRelativePath: "",
+      // 与 finishOrdering 的 movedRelativePath 一致：根级路径就是分类名。
+      targetRelativePath: sourceCategory.name,
+    });
   };
 
   const finishOrdering = (): void => {
@@ -556,6 +628,19 @@ export function CategorySidebar({
         }
         readOnly={readOnly}
       />
+      {dragState === null || dragState.sourceParentRelativePath === "" ? null : (
+        <div
+          aria-hidden="true"
+          className={`category-root-drop ${rootDropActive ? "active" : ""}`}
+          data-category-root-drop="true"
+          onPointerEnter={updateRootDropTarget}
+          onPointerLeave={() => {
+            setRootDropActive(false);
+            setDropTarget(null);
+          }}
+          onPointerMove={updateRootDropTarget}
+        />
+      )}
       {snapshot !== null && snapshot.childCategories.length === 0 ? (
         <div className="sidebar-empty">当前目录没有子分类。</div>
       ) : null}
@@ -576,16 +661,23 @@ export function CategorySidebar({
             top: Math.min(contextMenu.y, window.innerHeight - contextMenuSize.height - 8),
           }}
         >
-          <button
-            className="category-context-action"
-            disabled={readOnly}
-            onClick={() => void createChildCategory()}
-            role="menuitem"
-            type="button"
-          >
-            <FolderPlus size={15} />
-            <span>新增子文件夹</span>
-          </button>
+          <div aria-hidden="true" className="category-context-pill" ref={contextMenuPillRef} />
+          <div className="category-context-actions">
+            <button
+              className="category-context-action"
+              disabled={readOnly}
+              onBlur={hideContextMenuPillIfLeavingActions}
+              onClick={() => void createChildCategory()}
+              onFocus={(event) => moveContextMenuPill(event.currentTarget, false)}
+              onMouseEnter={(event) => moveContextMenuPill(event.currentTarget, false)}
+              onMouseLeave={hideContextMenuPillIfLeavingActions}
+              role="menuitem"
+              type="button"
+            >
+              <FolderPlus size={15} />
+              <span>新增子文件夹</span>
+            </button>
+          </div>
           <div className="category-context-divider" />
           <fieldset aria-label="文件夹外观" className="category-style-options">
             {folderStyleOptions.map((option) => (
@@ -629,36 +721,49 @@ export function CategorySidebar({
             />
           </label>
           <div className="category-context-divider" />
-          <button
-            className="category-context-action"
-            disabled={readOnly}
-            onClick={() => {
-              const relativePath = contextMenu.relativePath;
-              setContextMenu(null);
-              onSelect(relativePath);
-              setEditingRelativePath(relativePath);
-            }}
-            role="menuitem"
-            type="button"
-          >
-            <Pencil size={15} />
-            <span>重命名</span>
-          </button>
-          <button
-            className="category-context-action category-context-delete"
-            disabled={readOnly}
-            onClick={() => {
-              const relativePath = contextMenu.relativePath;
-              const hasPatches = categoryHasPatches(snapshot?.childCategories ?? [], relativePath);
-              setContextMenu(null);
-              onDeleteCategory(relativePath, hasPatches);
-            }}
-            role="menuitem"
-            type="button"
-          >
-            <Trash2 size={15} />
-            <span>删除文件夹</span>
-          </button>
+          <div className="category-context-actions">
+            <button
+              className="category-context-action"
+              disabled={readOnly}
+              onBlur={hideContextMenuPillIfLeavingActions}
+              onClick={() => {
+                const relativePath = contextMenu.relativePath;
+                setContextMenu(null);
+                onSelect(relativePath);
+                setEditingRelativePath(relativePath);
+              }}
+              onFocus={(event) => moveContextMenuPill(event.currentTarget, false)}
+              onMouseEnter={(event) => moveContextMenuPill(event.currentTarget, false)}
+              onMouseLeave={hideContextMenuPillIfLeavingActions}
+              role="menuitem"
+              type="button"
+            >
+              <Pencil size={15} />
+              <span>重命名</span>
+            </button>
+            <button
+              className="category-context-action category-context-delete"
+              disabled={readOnly}
+              onBlur={hideContextMenuPillIfLeavingActions}
+              onClick={() => {
+                const relativePath = contextMenu.relativePath;
+                const hasPatches = categoryHasPatches(
+                  snapshot?.childCategories ?? [],
+                  relativePath,
+                );
+                setContextMenu(null);
+                onDeleteCategory(relativePath, hasPatches);
+              }}
+              onFocus={(event) => moveContextMenuPill(event.currentTarget, true)}
+              onMouseEnter={(event) => moveContextMenuPill(event.currentTarget, true)}
+              onMouseLeave={hideContextMenuPillIfLeavingActions}
+              role="menuitem"
+              type="button"
+            >
+              <Trash2 size={15} />
+              <span>删除文件夹</span>
+            </button>
+          </div>
         </div>
       )}
     </nav>
