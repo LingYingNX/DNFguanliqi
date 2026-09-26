@@ -1,8 +1,9 @@
 export const APP_NAME = "DNF 补丁管理器";
 export const APP_VERSION = "1.2.8";
 export const APP_RELEASE_NOTES = [
-  "增加选中多个补丁后可以对其批量开启。",
-  "优化软件动效设计。",
+  "重构右键菜单样式",
+  "修复子文件夹无法单独拖出来，变成新的独立文件夹",
+  "优化视觉观感",
 ] as const;
 
 export type AppInfo = {
